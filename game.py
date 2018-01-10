@@ -101,9 +101,9 @@ class Pixel(object):
         self.colorOverride = None
         self.alphaOverride = None
 
-    def setPowerup(self, color):
+    def setPowerup(self):
     	self.powerup = True
-    	self.color = color
+    	self.color = 6
 
 	def unsetPowerup(self):
 		self.powerup = False
