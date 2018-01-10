@@ -68,12 +68,15 @@ class Line(object):
 class Pixel(object):
     
     def __init__(self):
-        self.color = 0
+    	self.reset()
+
+    def reset(self):
+    	self.color = 0
         self.colorOverride = None
         self.alpha = 0
         self.alphaOverride = None
         self.player = None
-        self.powerup = True
+        self.powerup = False
         self.pulseTicker = 0;
 
     def getData(self):
@@ -116,10 +119,14 @@ class Pixel(object):
 class Player(object):
 
     def __init__(self, startingNode, colorId, colorValue, move):
+    	self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
         self.move = move
-        self.currentLine = None
+        self.reset()
+
+    def reset(self):
+    	self.currentLine = None
         self.currentLineIndex = 0
         self.currentLineDirection = 1
         self.currentNode = startingNode
@@ -127,13 +134,13 @@ class Player(object):
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
         self.pixels = [self.startingNode.pixels] #each element is a set of pixels, since nodes have 2 pixels
         self.length = 1
-        self.alive = True
+        self.alive = False
         self.ready = False # for starting the game
 
-        self.advanceToPixels(self.currentNode.pixels)
+        #self.advanceToPixels(self.currentNode.pixels)
         #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
 
-        self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
+        self.move.set_leds(0, 0, 0)
         self.move.update_leds()
 
     def update(self):
@@ -307,6 +314,16 @@ def refillPowerups(count):
 	  
 def resetGame():
 	# Clear board and reset players
+	for node in nodes:
+		for pixel in node.pixels:
+			pixel.reset()
+	for line in lines:
+		for pixel in line.pixels:
+			pixel.reset()
+	for player in players:
+		player.reset()
+
+
 
 
 def endGame():
@@ -335,7 +352,7 @@ moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
 ###
 
 ### PLAYER CONFIG
-player = [
+players = [
     Player(nodes[0], 1, [255,0,0], moves[0]),
     Player(nodes[0], 2, [0,255,0], moves[1]),
     Player(nodes[0], 3, [0,0,255], moves[2]),
@@ -375,7 +392,7 @@ while True:
     	joinedPlayers = list(filter(lambda player: player.alive, players))
     	if len(joinedPlayers) > 0:
     		readyPlayers = list(filter(lambda player: player.ready, joinedPlayers))
-    		if len(readyPlayers) == len(joinedPlayers):
+    		if len(readyPlayers) == len(joinedPlayers) or len(joinedPlayers) == len(players):
     			startGame()
 
 
