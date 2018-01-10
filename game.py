@@ -8,6 +8,9 @@ import sys
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
 
+pygame.init()
+clock = pygame.time.Clock()
+
 ##
 
 class Node(object):
@@ -132,6 +135,8 @@ class Player(object):
         self.currentNode = startingNode
         self.currentNodeExitIndex = 0
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
+        self.moveMultiplier = 1
+        self.movesBeforeMultiplierReset = 0 
         self.pixels = [self.startingNode.pixels] #each element is a set of pixels, since nodes have 2 pixels
         self.length = 1
         self.alive = False
@@ -157,9 +162,9 @@ class Player(object):
 
         # Movement
         if self.currentLine is not None:
-            self.moveAccum += 2
-            if (self.moveAccum == 20):
-                self.moveAccum = 0
+            self.moveAccum += 2 * self.moveMultiplier
+            if (self.moveAccum >= 20):
+                self.moveAccum -= 20
                 self.currentLineIndex += self.currentLineDirection
                 atNode = self.currentLine.isIndexAtNode(self.currentLineIndex)
                 if atNode is None:
@@ -169,7 +174,13 @@ class Player(object):
                     self.currentLine = None
                     self.currentNode = atNode
                     self.currentNodeExitIndex = -1
+                    self.moveAccum = 0
                     self.advanceToPixels(self.currentNode.pixels)
+
+                if self.movesBeforeMultiplierReset > 0:
+                	self.movesBeforeMultiplierReset -= 1
+                	if self.movesBeforeMultiplierReset == 0:
+                		self.moveMultiplier = 1
 
         # Staying still at a node
         if self.currentNone is not None:
@@ -210,6 +221,8 @@ class Player(object):
 
     def powerup(self):
     	self.length += 2
+    	self.moveMultiplier = 2
+    	self.movesBeforeMultiplierReset = 10
 
     def kill(self):
         self.alive = False
@@ -323,12 +336,10 @@ def resetGame():
 	for player in players:
 		player.reset()
 
-
-
-
 def endGame():
 	global gameRunning
 	gameRunning = False
+	pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 2000)
 
 def startGame():
 	global gameRunning
@@ -337,7 +348,7 @@ def startGame():
 ##
 
 
-### STRAND CONFIG
+### BOARD CONFIG
 nodes = [Node(1), Node(1), Node(1), Node(1), Node(1)]
 lines = [Line(14), Line(13), Line(14), Line(13)]
 
@@ -362,16 +373,21 @@ players = [
 ]
 ###
 
-
+### SERIAL CONFIG
 print("\n\n", [port.device for port in list_ports.comports()], "\n\n")
 ser = serial.Serial('/dev/cu.wchusbserial1460', 115200)
+###
 
-time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
-
-pygame.init()
-clock = pygame.time.Clock()
+### MISC DECLARATIONS
+USEREVENT_ENDGAME_COMPLETE = USEREVENT+1
 
 gameRunning = False
+###
+
+
+### MAKE ROCKET GO
+
+time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
 
 while True:
     clock.tick(30)
@@ -397,14 +413,15 @@ while True:
     		if len(readyPlayers) == len(joinedPlayers) or len(joinedPlayers) == len(players):
     			startGame()
 
-
-
-    # for event in pygame.event.get():
-    #     if event.type == pygame.KEYDOWN:
-    #         if event.key == pygame.K_TAB:
-    #             player.advanceNodeExit()
-    #         elif event.key == pygame.K_SPACE:
-    #             player.goNodeExit()
+    for event in pygame.event.get():
+    	if event.type == USEREVENT_ENDGAME_COMPLETE
+    		pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 0)
+    		resetGame()
+        # if event.type == pygame.KEYDOWN:
+        #     if event.key == pygame.K_TAB:
+        #         player.advanceNodeExit()
+        #     elif event.key == pygame.K_SPACE:
+        #         player.goNodeExit()
 
     for strand in strands:
         pixelData = [pixel.getData() for pixel in getStrandPixels(strand)]
