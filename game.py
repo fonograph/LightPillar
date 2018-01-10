@@ -127,16 +127,19 @@ class Player(object):
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
         self.pixels = [self.startingNode.pixels] #each element is a set of pixels, since nodes have 2 pixels
         self.length = 1
-        self.alive = False
+        self.alive = True
         self.ready = False # for starting the game
 
         self.advanceToPixels(self.currentNode.pixels)
         #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
 
-        self.move.set_leds(0, 0, 0)
+        self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
         self.move.update_leds()
 
     def update(self):
+    	if not self.alive:
+    		return
+
         # Controls
         while self.move.poll():
             pressed, released = self.move.get_button_events()
@@ -161,7 +164,7 @@ class Player(object):
                     self.currentNodeExitIndex = -1
                     self.advanceToPixels(self.currentNode.pixels)
 
-        # Staying still at a note
+        # Staying still at a node
         if self.currentNone is not None:
             self.currentNode.pulse()
 
@@ -173,8 +176,10 @@ class Player(object):
     			self.alive = not self.alive
     			if self.alive:
     				self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
+    				self.advanceToPixels(self.currentNode.pixels)
     			else:
     				self.move.set_leds(0, 0, 0)
+    				self.removeFromAllPixels()
         		self.move.update_leds()
 
 
@@ -201,6 +206,7 @@ class Player(object):
 
     def kill(self):
         self.alive = False
+        self.removeFromAllPixels()
         self.move.set_leds(0, 0, 0)
         self.move.update_leds()
 
@@ -242,6 +248,11 @@ class Player(object):
         for i, pixelSet in enumerate(self.pixels):
             for pixel in pixelSet:
                 pixel.setPlayer(self, (i+1)/len(self.pixels))
+
+    def removeFromAllPixels(self):
+		for pixelSet in self.pixels:
+            for pixel in pixelSet:
+                pixel.unsetPlayer()
 
 
 ##
@@ -296,7 +307,7 @@ def refillPowerups(count):
 	  
 def resetGame():
 	# Clear board and reset players
-	
+
 
 def endGame():
 	gameRunning = False
