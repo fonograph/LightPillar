@@ -1,5 +1,6 @@
 import pygame
 import pygame.time
+import random
 import serial
 from serial.tools import list_ports
 import time
@@ -24,13 +25,9 @@ class Node(object):
     def getPixelData(self):
         return [pixel.getData() for pixel in self.pixels]
 
-    def setPlayerAt(self, color):
+    def pulse(self):
         for pixel in self.pixels:
-            pixel.setNodeHighlight(color)
-
-    def removePlayerFrom(self, color):
-        for pixel in self.pixels:
-            pixel.unsetNodeHighlight(color)
+            pixel.pulse()
 
 ##
 
@@ -50,17 +47,13 @@ class Line(object):
     def getPixelData(self):
         return [pixel.getData() for pixel in self.pixels]
 
-    def setPlayerAt(self, index, color):
+    def isIndexAtNode(self, index):
         if (index < 0):
             return self.node1
         elif (index >= len(self.pixels)):
             return self.node2
         else:
-            self.pixels[index].setLineHighlight(color)
             return None
-
-    def removePlayerFrom(self, index, color):
-        self.pixels[index].unsetLineHighlight(color)
 
     def setPointer(self, color, node):
         pixel = self.pixels[0] if node == self.node1 else self.pixels[-1]
@@ -76,10 +69,6 @@ class Line(object):
     def getFirstPixelIndexFromNode(self, node):
         return 0 if node == self.node1 else len(self.pixels)-1
 
-    def update(self):
-        for pixel in self.pixels:
-            pixel.fade()
-
 ##
 
 class Pixel(object):
@@ -89,71 +78,86 @@ class Pixel(object):
         self.colorOverride = None
         self.alpha = 0
         self.alphaOverride = None
+        self.player = None
+        self.pulseTicker = 0;
 
     def getData(self):
         color = self.color if self.colorOverride is None else self.colorOverride
         alpha = self.alpha if self.alphaOverride is None else self.alphaOverride
-        return (color << 6) + round(alpha*63)
+        return (color << 5) + round(alpha*31)
 
-    def setLineHighlight(self, color):
-        self.color = color
-        self.alpha = 1
+    def setPlayer(self, player, alpha):
+        self.player = player
+        self.color = player.color
+        self.alpha = alpha
 
-    def unsetLineHighlight(self, color):
-        self.alpha = 0.5
-
-    def setNodeHighlight(self, color):
-        self.color = color
-        self.alpha = 1
-
-    def unsetNodeHighlight(self, color):
-        self.color = color
-        self.alpha = 0.5
+    def unsetPlayer(self):
+        self.player = None
+        self.color = 0
 
     def setLinePointer(self, color):
-        self.colorOverride = 2
+        self.colorOverride = 5
         self.alphaOverride = 1
 
     def unsetLinePointer(self, color):
         self.colorOverride = None
         self.alphaOverride = None
 
-    def fade(self):
-        self.alpha -= 0.005
-        if (self.alpha < 0):
-            self.alpha = 0
+    def pulse(self):
+        self.alpha = 0.5 + (self.pulseTicker++ % 100)/200
+        # This does not need to be "undone" when a player leaves this pixel, because setPlayer is set on every pixel in a player's length on every frame
 
 ##
 
 class Player(object):
 
-    def __init__(self, startingNode, color):
-        self.color = color
+    def __init__(self, startingNode, colorId, colorValue, move):
+        self.color = colorId
+        self.move = move
         self.currentLine = None
         self.currentLineIndex = 0
         self.currentLineDirection = 1
         self.currentNode = startingNode
         self.currentNodeExitIndex = 0
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
+        self.pixels = [self.startingNode.pixels] #each element is a set of pixels, since nodes have 2 pixels
+        self.length = 1
+        self.alive = True
 
-        self.currentNode.setPlayerAt(color)
-        self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
+        self.advanceToPixels(self.currentNode.pixels)
+        #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
+
+        self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
+        self.move.update_leds()
 
     def update(self):
-        if (self.currentLine is not None):
+        # Controls
+        while move.poll():
+            pressed, released = move.get_button_events()
+            if pressed & psmove.Btn_T:
+                self.goNodeExit()
+            elif press & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
+                self.advanceNodeExit()
+
+        # Movement
+        if self.currentLine is not None:
             self.moveAccum += 2
             if (self.moveAccum == 20):
                 self.moveAccum = 0
-                self.currentLine.removePlayerFrom(self.currentLineIndex, self.color)
                 self.currentLineIndex += self.currentLineDirection
-                atNode = self.currentLine.setPlayerAt(self.currentLineIndex, self.color)
-                if (atNode is not None):
+                atNode = self.currentLine.isIndexAtNode(self.currentLineIndex)
+                if atNode is None:
+                    self.advanceToPixels(self.currentLine.pixels[self.currentLineIndex])
+                else:
                     # Arrive at node
                     self.currentLine = None
                     self.currentNode = atNode
-                    self.currentNode.setPlayerAt(self.color)
                     self.currentNodeExitIndex = -1
-                    #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
+                    self.advanceToPixels(self.currentNode.pixels)
+
+        # Staying still at a note
+        if self.currentNone is not None:
+            self.currentNode.pulse()
 
     def advanceNodeExit(self):
         if self.currentNode:
@@ -172,6 +176,45 @@ class Player(object):
             self.currentNode.lines[self.currentNodeExitIndex].unsetPointer(self.color, self.currentNode)
             self.currentNode = None
             self.moveAccum = 0
+
+    def kill(self):
+        self.alive = False
+        self.move.set_leds(0, 0, 0)
+        self.move.update_leds()
+
+    def collideWith(self, player):
+        if self.pixels[-1][0] == player.pixels[-1][0]: 
+            # head on collision
+            if self.length >= player.length
+                player.kill()
+            if self.length <= player.length
+                self.kill()
+        else:
+            self.kill()
+
+    def advanceToPixels(self, newPixels):
+        if not isinstance(newPixels, list):
+            newPixels = [newPixels]
+
+        # Collision?
+        for pixel in newPixels:
+            if pixel.player is not None and pixel.player != self:
+                self.collideWith(pixel.player)
+                if not self.alive:
+                    return;
+
+        self.pixels += [newPixels];
+
+        if (len(self.pixels) > self.length):
+            oldPixelSet = self.pixels[1]
+            self.pixels = self.pixels[1:]
+            for pixel in oldPixelSet:
+                pixel.unsetPlayer()
+
+        for i, pixelSet in enumerate(self.pixels):
+            for pixel in pixelSet:
+                pixel.setPlayer(self, (i+1)/len(self.pixels))
+
 
 ##
 
@@ -202,8 +245,17 @@ def connectNodesToLine(node1, node2, line):
     line.setNode1(node1)
     line.setNode2(node2)
 
-
-
+def generatePowerups(count):
+    # Find a line >= 3px with no players in it
+    generated = 0
+    random.shuffle(lines)
+    for line in lines:
+        noPlayers = True
+        for pixel in line.pixels:
+            noPlayers = noPlayers and pixel.player is None
+        if noPlayers:
+            # Make one
+            generated++
 
 
 
@@ -224,8 +276,14 @@ moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
 ###
 
 ### PLAYER CONFIG
-player = Player(nodes[0], 0)
+player = [
+    Player(nodes[0], 1, [255,0,0], moves[0]),
+    Player(nodes[0], 2, [0,255,0], moves[1]),
+    Player(nodes[0], 3, [0,0,255], moves[2]),
+    Player(nodes[0], 4, [255,255,0], moves[3])
+]
 ###
+
 
 print("\n\n", [port.device for port in list_ports.comports()], "\n\n")
 ser = serial.Serial('/dev/cu.wchusbserial1460', 115200)
@@ -235,29 +293,30 @@ time.sleep(2) # the serial connection resets the arduino, so give the program ti
 pygame.init()
 clock = pygame.time.Clock()
 
+gameRunning = False
+lastPowerupTime = 0
+
 while True:
     clock.tick(30)
 
-    player.update()
+    if gameRunning:
+        for player in players:
+            player.update()
 
-    for line in lines:
-        line.update()
+        if (pygame.time.get_ticks - lastPowerupTime)/1000 > 
 
-    for event in pygame.event.get():
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_TAB:
-                player.advanceNodeExit()
-            elif event.key == pygame.K_SPACE:
-                player.goNodeExit()
 
-    pixelData = []
+    # for event in pygame.event.get():
+    #     if event.type == pygame.KEYDOWN:
+    #         if event.key == pygame.K_TAB:
+    #             player.advanceNodeExit()
+    #         elif event.key == pygame.K_SPACE:
+    #             player.goNodeExit()
+
     for strand in strands:
-        pixelData += [pixel.getData() for pixel in getStrandPixels(strand)]
-
-    print(pixelData)
-
-    ser.write(bytes(pixelData))
-    ser.flush()
-
-    print(ser.readline())
+        pixelData = [pixel.getData() for pixel in getStrandPixels(strand)]
+        print(pixelData)
+        ser.write(bytes(pixelData))
+        ser.flush()
+        print(ser.readline())
 
