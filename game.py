@@ -22,9 +22,6 @@ class Node(object):
     def addLine(self, line):
         self.lines.append(line)
 
-    def getPixelData(self):
-        return [pixel.getData() for pixel in self.pixels]
-
     def pulse(self):
         for pixel in self.pixels:
             pixel.pulse()
@@ -43,9 +40,6 @@ class Line(object):
 
     def setNode2(self, node):
         self.node2 = node
-
-    def getPixelData(self):
-        return [pixel.getData() for pixel in self.pixels]
 
     def isIndexAtNode(self, index):
         if (index < 0):
@@ -79,6 +73,7 @@ class Pixel(object):
         self.alpha = 0
         self.alphaOverride = None
         self.player = None
+        self.powerup = True
         self.pulseTicker = 0;
 
     def getData(self):
@@ -103,8 +98,17 @@ class Pixel(object):
         self.colorOverride = None
         self.alphaOverride = None
 
+    def setPowerup(self, color):
+    	self.powerup = True
+    	self.color = color
+
+	def unsetPowerup(self):
+		self.powerup = False
+		self.color = 0
+
     def pulse(self):
-        self.alpha = 0.5 + (self.pulseTicker++ % 100)/200
+        self.alpha = 0.5 + (self.pulseTicker % 100)/200
+        self.pulseTicker += 1
         # This does not need to be "undone" when a player leaves this pixel, because setPlayer is set on every pixel in a player's length on every frame
 
 ##
@@ -113,6 +117,7 @@ class Player(object):
 
     def __init__(self, startingNode, colorId, colorValue, move):
         self.color = colorId
+        self.colorValue = colorValue
         self.move = move
         self.currentLine = None
         self.currentLineIndex = 0
@@ -122,21 +127,22 @@ class Player(object):
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
         self.pixels = [self.startingNode.pixels] #each element is a set of pixels, since nodes have 2 pixels
         self.length = 1
-        self.alive = True
+        self.alive = False
+        self.ready = False # for starting the game
 
         self.advanceToPixels(self.currentNode.pixels)
         #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
 
-        self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
+        self.move.set_leds(0, 0, 0)
         self.move.update_leds()
 
     def update(self):
         # Controls
-        while move.poll():
-            pressed, released = move.get_button_events()
+        while self.move.poll():
+            pressed, released = self.move.get_button_events()
             if pressed & psmove.Btn_T:
                 self.goNodeExit()
-            elif press & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
+            elif pressed & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
                 self.advanceNodeExit()
 
         # Movement
@@ -159,6 +165,19 @@ class Player(object):
         if self.currentNone is not None:
             self.currentNode.pulse()
 
+    def updateOutOfGame(self):
+    	while move.poll():
+    		self.ready = move.get_trigger() > 0
+    		pressed, released = self.move.get_button_events()
+    		if (pressed & psmove.Btn_MOVE):
+    			self.alive = not self.alive
+    			if self.alive:
+    				self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
+    			else:
+    				self.move.set_leds(0, 0, 0)
+        		self.move.update_leds()
+
+
     def advanceNodeExit(self):
         if self.currentNode:
             if self.currentNodeExitIndex is not None:
@@ -176,6 +195,9 @@ class Player(object):
             self.currentNode.lines[self.currentNodeExitIndex].unsetPointer(self.color, self.currentNode)
             self.currentNode = None
             self.moveAccum = 0
+
+    def powerup(self):
+    	self.length += 2
 
     def kill(self):
         self.alive = False
@@ -203,7 +225,13 @@ class Player(object):
                 if not self.alive:
                     return;
 
-        self.pixels += [newPixels];
+        # Powerup?
+        for pixel in newPixels:
+        	if pixel.powerup:
+        		self.powerup()
+        		pixel.unsetPowerup()
+
+        self.pixels.append(newPixels);
 
         if (len(self.pixels) > self.length):
             oldPixelSet = self.pixels[1]
@@ -245,18 +273,38 @@ def connectNodesToLine(node1, node2, line):
     line.setNode1(node1)
     line.setNode2(node2)
 
-def generatePowerups(count):
-    # Find a line >= 3px with no players in it
-    generated = 0
-    random.shuffle(lines)
-    for line in lines:
-        noPlayers = True
-        for pixel in line.pixels:
-            noPlayers = noPlayers and pixel.player is None
-        if noPlayers:
-            # Make one
-            generated++
+def refillPowerups(count):
+	# Find existing powerups
+	existingCount = 0
+	for line in lines:
+		for pixel in line.pixels:
+			if pixel.powerup:
+				existingCount += 1
 
+	availableLines = []
+	for line in lines
+		available = len(line.pixels) >= 3
+        for pixel in line.pixels:
+            available = available and pixel.player is None and pixel.powerup == False
+        if available:
+	        availableLines.append(line)
+	random.shuffle(availableLines)
+
+	for i in range(count - existingCount):
+	    if i < len(availableLines):
+	    	availableLines[i].pixels[random.randrange(1, len(availableLines[i].pixels)-1)].setPowerup()
+	  
+def resetGame():
+	# Clear board and reset players
+	
+
+def endGame():
+	gameRunning = False
+
+def startGame():
+	gameRunning = True
+
+##
 
 
 ### STRAND CONFIG
@@ -294,7 +342,6 @@ pygame.init()
 clock = pygame.time.Clock()
 
 gameRunning = False
-lastPowerupTime = 0
 
 while True:
     clock.tick(30)
@@ -303,7 +350,23 @@ while True:
         for player in players:
             player.update()
 
-        if (pygame.time.get_ticks - lastPowerupTime)/1000 > 
+    	refillPowerups(4)
+
+    	# Game over?
+    	livingPlayers = list(filter(lambda player: player.alive, players))
+    	if (livingPlayers <= 1):
+    		endGame()
+    else:
+    	for player in players:
+    		player.updateOutOfGame()
+
+    	# Start game?
+    	joinedPlayers = list(filter(lambda player: player.alive, players))
+    	if len(joinedPlayers) > 0:
+    		readyPlayers = list(filter(lambda player: player.ready, joinedPlayers))
+    		if len(readyPlayers) == len(joinedPlayers):
+    			startGame()
+
 
 
     # for event in pygame.event.get():
