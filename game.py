@@ -327,9 +327,11 @@ def resetGame():
 
 
 def endGame():
+	global gameRunning
 	gameRunning = False
 
 def startGame():
+	global gameRunning
 	gameRunning = True
 
 ##
