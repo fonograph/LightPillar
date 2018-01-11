@@ -60,14 +60,22 @@ void updateStrip(Adafruit_NeoPixel* strip, byte* data) {
   byte color;
   byte alpha;
   for (byte i = 0; i <= PIXELS_PER_STRIP; i++) {
-    color = data[i] >> 6;
-    alpha = (data[i] & B00111111) << 2;
+    color = data[i] >> 5;
+    alpha = (data[i] & B00011111) << 3;
     if (color == 0) {
-      strip->setPixelColor(i, strip->Color(alpha/4, 0, 0));
+      strip->setPixelColor(i, strip->Color(0, 0, 0));
     } else if (color == 1) {
-      strip->setPixelColor(i, strip->Color(0, alpha/4, 0));
+      strip->setPixelColor(i, strip->Color(alpha/4, 0, 0));
     } else if (color == 2) {
+      strip->setPixelColor(i, strip->Color(0, alpha/4, 0));
+    } else if (color == 3) {
+      strip->setPixelColor(i, strip->Color(0, 0, alpha/4));
+    } else if (color == 4) {
+      strip->setPixelColor(i, strip->Color(alpha/4, alpha/4, 0));
+    } else if (color == 5) {
       strip->setPixelColor(i, strip->Color(alpha/8, alpha/8, alpha/8));
+    } else if (color == 6) {
+      strip->setPixelColor(i, strip->Color(0, alpha/4, alpha/4));
     }
   }
   strip->show();

@@ -15,40 +15,35 @@ clock = pygame.time.Clock()
 
 class Node(object):
 
-    def __init__(self, pixelCount):
+    def __init__(self):
         self.lines = []
-        self.pixels = []
-
-        for i in range(pixelCount):
-            self.pixels.append(Pixel())
+        self.pixel = Pixel()
+        self.pixels = [self.pixel]
 
     def addLine(self, line):
         self.lines.append(line)
 
     def pulse(self):
-        for pixel in self.pixels:
-            pixel.pulse()
+        pixel.pulse()
 
 ##
 
 class Line(object):                        
    
     def __init__(self, pixelCount):
+        self.node1 = None
+        self.node2 = None
+        self.line1 = None #continuing line from start
+        self.line2 = None #continuing line from end
         self.pixels = []
         for i in range(pixelCount):
             self.pixels.append(Pixel())
 
-    def setNode1(self, node):
-        self.node1 = node
-
-    def setNode2(self, node):
-        self.node2 = node
-
-    def isIndexAtNode(self, index):
+    def isIndexAtConnection(self, index):
         if (index < 0):
-            return self.node1
+            return self.node1 if self.node1 is not None else self.line1
         elif (index >= len(self.pixels)):
-            return self.node2
+            return self.node2 if self.node2 is not None else self.line2
         else:
             return None
 
@@ -65,6 +60,12 @@ class Line(object):
 
     def getFirstPixelIndexFromNode(self, node):
         return 0 if node == self.node1 else len(self.pixels)-1
+
+    def getDirectionFromLine(self, line):
+        return 1 if line == self.line1 else -1
+
+    def getFirstPixelIndexFromLine(self, line):
+        return 0 if line == self.line1 else len(self.pixels)-1
 
 ##
 
@@ -137,12 +138,12 @@ class Player(object):
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
         self.moveMultiplier = 1
         self.movesBeforeMultiplierReset = 0 
-        self.pixels = [self.startingNode.pixels] #each element is a set of pixels, since nodes have 2 pixels
+        self.pixels = [self.startingNode.pixel] 
         self.length = 1
         self.alive = False
         self.ready = False # for starting the game
 
-        #self.advanceToPixels(self.currentNode.pixels)
+        #self.advanceToPixels(self.currentNode.pixel)
         #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
 
         self.move.set_leds(0, 0, 0)
@@ -166,16 +167,21 @@ class Player(object):
             if (self.moveAccum >= 20):
                 self.moveAccum -= 20
                 self.currentLineIndex += self.currentLineDirection
-                atNode = self.currentLine.isIndexAtNode(self.currentLineIndex)
-                if atNode is None:
+                atConnection = self.currentLine.isIndexAtConnection(self.currentLineIndex)
+                if atConnection is None:
                     self.advanceToPixels(self.currentLine.pixels[self.currentLineIndex])
-                else:
+                elif isinstance(atConnection, Line):
+                    self.currentLine = atConnection
+                    self.currentLineDirection = self.currentLine.getDirectionFromLine(self.currentNode)
+                    self.currentLineIndex = self.currentLine.getFirstPixelIndexFromLine(self.currentNode)
+                    self.advanceToPixels(self.currentLine.pixels[self.currentLineIndex])
+                elif isinstance(atConnection, Node):
                     # Arrive at node
                     self.currentLine = None
-                    self.currentNode = atNode
+                    self.currentNode = atConnection
                     self.currentNodeExitIndex = -1
                     self.moveAccum = 0
-                    self.advanceToPixels(self.currentNode.pixels)
+                    self.advanceToPixels(self.currentNode.pixel)
 
                 if self.movesBeforeMultiplierReset > 0:
                 	self.movesBeforeMultiplierReset -= 1
@@ -194,7 +200,7 @@ class Player(object):
     			self.alive = not self.alive
     			if self.alive:
     				self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
-    				self.advanceToPixels(self.currentNode.pixels)
+    				self.advanceToPixels(self.currentNode.pixel)
     			else:
     				self.move.set_leds(0, 0, 0)
     				self.removeFromAllPixels()
@@ -231,7 +237,7 @@ class Player(object):
         self.move.update_leds()
 
     def collideWith(self, player):
-        if self.pixels[-1][0] == player.pixels[-1][0]: 
+        if self.pixels[-1] == player.pixels[-1]: 
             # head on collision
             if self.length >= player.length
                 player.kill()
@@ -240,39 +246,30 @@ class Player(object):
         else:
             self.kill()
 
-    def advanceToPixels(self, newPixels):
-        if not isinstance(newPixels, list):
-            newPixels = [newPixels]
-
+    def advanceToPixel(self, newPixel):
         # Collision?
-        for pixel in newPixels:
-            if pixel.player is not None and pixel.player != self:
-                self.collideWith(pixel.player)
-                if not self.alive:
-                    return;
+        if newPixel.player is not None and newPixel.player != self:
+            self.collideWith(newPixel.player)
+            if not self.alive:
+                return;
 
         # Powerup?
-        for pixel in newPixels:
-        	if pixel.powerup:
-        		self.powerup()
-        		pixel.unsetPowerup()
+    	if newPixel.powerup:
+    		self.powerup()
+    		newPixel.unsetPowerup()
 
-        self.pixels.append(newPixels);
+        self.pixels.append(newPixel);
 
         if (len(self.pixels) > self.length):
-            oldPixelSet = self.pixels[1]
+            self.pixels[0].unsetPlayer()
             self.pixels = self.pixels[1:]
-            for pixel in oldPixelSet:
-                pixel.unsetPlayer()
 
-        for i, pixelSet in enumerate(self.pixels):
-            for pixel in pixelSet:
-                pixel.setPlayer(self, (i+1)/len(self.pixels))
+        for i, pixel in enumerate(self.pixels):
+            pixel.setPlayer(self, (i+1)/len(self.pixels))
 
     def removeFromAllPixels(self):
-		for pixelSet in self.pixels:
-            for pixel in pixelSet:
-                pixel.unsetPlayer()
+		for pixel in self.pixels:
+            pixel.unsetPlayer()
 
 
 ##
@@ -285,24 +282,23 @@ def getStrandPixels(strand):
 
 
 def connectStrand(things):
-    lastNode = things[0]
-    for i in range(0, len(things)-2, 2):
-        node1 = things[i]
-        line = things[i+1]
-        node2 = things[i+2]
+    for i in range(1, len(things)-1, 2):
+        line1 = things[i-1]
+        node = things[i]
+        line2 = things[i+1]
 
-        node1.addLine(line)
-        node2.addLine(line)
-        line.setNode1(node1)
-        line.setNode2(node2)
+        line1.node2 = node
+        line2.node1 = node
+        node.addLine(line1)
+        node.addLine(line2)
+
+    startingLine = things[0]
+    endingLine = things[-1]
+
+    startingLine.line1 = endingLine
+    endingLine.line2 = startingLine
+
     return things
-
-
-def connectNodesToLine(node1, node2, line):
-    node1.addLine(line)
-    node2.addLine(line)
-    line.setNode1(node1)
-    line.setNode2(node2)
 
 def refillPowerups(count):
 	# Find existing powerups
@@ -328,8 +324,7 @@ def refillPowerups(count):
 def resetGame():
 	# Clear board and reset players
 	for node in nodes:
-		for pixel in node.pixels:
-			pixel.reset()
+		node.pixel.reset()
 	for line in lines:
 		for pixel in line.pixels:
 			pixel.reset()
@@ -349,12 +344,25 @@ def startGame():
 
 
 ### BOARD CONFIG
-nodes = [Node(1), Node(1), Node(1), Node(1), Node(1)]
-lines = [Line(14), Line(13), Line(14), Line(13)]
+nodes = [Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node()]
+lines = [
+    # 0
+    Line(8), Line(8), Line(3), Line(11), Line(3), Line(11), Line(3), Line(6),
+    # 8
+    Line(3), Line(14), Line(20), Line(5), Line(8), Line(2), Line(2),
+    # 15
+    Line(3), Line(6), Line(8), Line(2), Line(21), Line(9), Line(2), Line(2),
+    # 23
+    Line(4), Line(3), Line(14), Line(3), Line(14), Line(7), Line(9)
+
+
+]
 
 strands = [
-    connectStrand([nodes[0], lines[0], nodes[1], lines[1], nodes[2]]),
-    connectStrand([nodes[3], lines[2], nodes[1], lines[3], nodes[4]])
+    connectStrand([lines[0], nodes[10], lines[1], nodes[5], lines[2], nodes[4], lines[3], nodes[1], lines[4], nodes[3], lines[5], nodes[9], lines[6], nodes[11], lines[7]]),
+    connectStrand([lines[8], nodes[11], lines[9], nodes[7], lines[10], nodes[12], lines[11], nodes[9], lines[12], nodes[8], lines[13], nodes[12], lines[14]]),
+    connectStrand([lines[15], nodes[10], lines[16], nodes[6], lines[17], nodes[4], lines[18], nodes[3], lines[19], nodes[2], lines[20], nodes[7], lines[21], nodes[8], lines[22]]),
+    connectStrand([lines[23], nodes[5], lines[24], nodes[2], lines[25], nodes[0], lines[26], nodes[1], lines[27], nodes[0], lines[28], nodes[6], lines[29]]),
 ]
 
 startingNodes = [nodes[0], nodes[1]]
@@ -367,9 +375,9 @@ moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
 ### PLAYER CONFIG
 players = [
     Player(nodes[0], 1, [255,0,0], moves[0]),
-    Player(nodes[0], 2, [0,255,0], moves[1]),
-    Player(nodes[0], 3, [0,0,255], moves[2]),
-    Player(nodes[0], 4, [255,255,0], moves[3])
+    Player(nodes[1], 2, [0,255,0], moves[1]),
+    Player(nodes[2], 3, [0,0,255], moves[2]),
+    Player(nodes[3], 4, [255,255,0], moves[3])
 ]
 ###
 
@@ -428,5 +436,5 @@ while True:
         print(pixelData)
         ser.write(bytes(pixelData))
         ser.flush()
-        print(ser.readline())
+        #print(ser.readline())
 
