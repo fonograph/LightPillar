@@ -10,6 +10,8 @@ import psmove
 
 pygame.init()
 clock = pygame.time.Clock()
+screen = pygame.display.set_mode((320, 240))
+font = pygame.font.Font(None, 30)
 
 ##
 
@@ -24,7 +26,7 @@ class Node(object):
         self.lines.append(line)
 
     def pulse(self):
-        pixel.pulse()
+        self.pixel.pulse()
 
 ##
 
@@ -62,20 +64,20 @@ class Line(object):
         return 0 if node == self.node1 else len(self.pixels)-1
 
     def getDirectionFromLine(self, line):
-        return 1 if line == self.line1 else -1
+        return 1 if line == self.line2 else -1
 
     def getFirstPixelIndexFromLine(self, line):
-        return 0 if line == self.line1 else len(self.pixels)-1
+        return 0 if line == self.line2 else len(self.pixels)-1
 
 ##
 
 class Pixel(object):
     
     def __init__(self):
-    	self.reset()
+        self.reset()
 
     def reset(self):
-    	self.color = 0
+        self.color = 0
         self.colorOverride = None
         self.alpha = 0
         self.alphaOverride = None
@@ -106,12 +108,13 @@ class Pixel(object):
         self.alphaOverride = None
 
     def setPowerup(self):
-    	self.powerup = True
-    	self.color = 6
+        self.powerup = True
+        self.color = 6
+        self.alpha = 1
 
-	def unsetPowerup(self):
-		self.powerup = False
-		self.color = 0
+    def unsetPowerup(self):
+        self.powerup = False
+        self.color = 0
 
     def pulse(self):
         self.alpha = 0.5 + (self.pulseTicker % 100)/200
@@ -123,17 +126,17 @@ class Pixel(object):
 class Player(object):
 
     def __init__(self, startingNode, colorId, colorValue, move):
-    	self.startingNode = startingNode
+        self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
         self.move = move
         self.reset()
 
     def reset(self):
-    	self.currentLine = None
+        self.currentLine = None
         self.currentLineIndex = 0
         self.currentLineDirection = 1
-        self.currentNode = startingNode
+        self.currentNode = self.startingNode
         self.currentNodeExitIndex = 0
         self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
         self.moveMultiplier = 1
@@ -143,15 +146,15 @@ class Player(object):
         self.alive = False
         self.ready = False # for starting the game
 
-        #self.advanceToPixels(self.currentNode.pixel)
+        #self.advanceToPixel(self.currentNode.pixel)
         #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
 
         self.move.set_leds(0, 0, 0)
         self.move.update_leds()
 
     def update(self):
-    	if not self.alive:
-    		return
+        if not self.alive:
+            return
 
         # Controls
         while self.move.poll():
@@ -163,48 +166,50 @@ class Player(object):
 
         # Movement
         if self.currentLine is not None:
-            self.moveAccum += 2 * self.moveMultiplier
+            self.moveAccum += 5 * self.moveMultiplier
             if (self.moveAccum >= 20):
                 self.moveAccum -= 20
                 self.currentLineIndex += self.currentLineDirection
                 atConnection = self.currentLine.isIndexAtConnection(self.currentLineIndex)
                 if atConnection is None:
-                    self.advanceToPixels(self.currentLine.pixels[self.currentLineIndex])
+                    self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
                 elif isinstance(atConnection, Line):
                     self.currentLine = atConnection
                     self.currentLineDirection = self.currentLine.getDirectionFromLine(self.currentNode)
                     self.currentLineIndex = self.currentLine.getFirstPixelIndexFromLine(self.currentNode)
-                    self.advanceToPixels(self.currentLine.pixels[self.currentLineIndex])
+                    self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
                 elif isinstance(atConnection, Node):
                     # Arrive at node
                     self.currentLine = None
                     self.currentNode = atConnection
                     self.currentNodeExitIndex = -1
                     self.moveAccum = 0
-                    self.advanceToPixels(self.currentNode.pixel)
+                    self.advanceToPixel(self.currentNode.pixel)
 
                 if self.movesBeforeMultiplierReset > 0:
-                	self.movesBeforeMultiplierReset -= 1
-                	if self.movesBeforeMultiplierReset == 0:
-                		self.moveMultiplier = 1
+                    self.movesBeforeMultiplierReset -= 1
+                    if self.movesBeforeMultiplierReset == 0:
+                        self.moveMultiplier = 1
 
         # Staying still at a node
-        if self.currentNone is not None:
+        if self.currentNode is not None:
             self.currentNode.pulse()
 
+        self.move.update_leds()
+
     def updateOutOfGame(self):
-    	while move.poll():
-    		self.ready = move.get_trigger() > 0
-    		pressed, released = self.move.get_button_events()
-    		if (pressed & psmove.Btn_MOVE):
-    			self.alive = not self.alive
-    			if self.alive:
-    				self.move.set_leds(colorValue[0], colorValue[1], colorValue[2])
-    				self.advanceToPixels(self.currentNode.pixel)
-    			else:
-    				self.move.set_leds(0, 0, 0)
-    				self.removeFromAllPixels()
-        		self.move.update_leds()
+        while self.move.poll():
+            self.ready = self.move.get_trigger() > 0
+            pressed, released = self.move.get_button_events()
+            if (pressed & psmove.Btn_MOVE):
+                self.alive = not self.alive
+                if self.alive:
+                    self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
+                    self.advanceToPixel(self.currentNode.pixel)
+                else:
+                    self.move.set_leds(0, 0, 0)
+                    self.removeFromAllPixels()
+        self.move.update_leds()
 
 
     def advanceNodeExit(self):
@@ -224,13 +229,15 @@ class Player(object):
             self.currentNode.lines[self.currentNodeExitIndex].unsetPointer(self.color, self.currentNode)
             self.currentNode = None
             self.moveAccum = 0
+            self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
 
     def powerup(self):
-    	self.length += 2
-    	self.moveMultiplier = 2
-    	self.movesBeforeMultiplierReset = 10
+        self.length += 2
+        self.moveMultiplier = 2
+        self.movesBeforeMultiplierReset = 10
 
     def kill(self):
+        print("Dead")
         self.alive = False
         self.removeFromAllPixels()
         self.move.set_leds(0, 0, 0)
@@ -239,9 +246,9 @@ class Player(object):
     def collideWith(self, player):
         if self.pixels[-1] == player.pixels[-1]: 
             # head on collision
-            if self.length >= player.length
+            if self.length >= player.length:
                 player.kill()
-            if self.length <= player.length
+            if self.length <= player.length:
                 self.kill()
         else:
             self.kill()
@@ -254,9 +261,9 @@ class Player(object):
                 return;
 
         # Powerup?
-    	if newPixel.powerup:
-    		self.powerup()
-    		newPixel.unsetPowerup()
+        if newPixel.powerup:
+            self.powerup()
+            newPixel.unsetPowerup()
 
         self.pixels.append(newPixel);
 
@@ -268,7 +275,7 @@ class Player(object):
             pixel.setPlayer(self, (i+1)/len(self.pixels))
 
     def removeFromAllPixels(self):
-		for pixel in self.pixels:
+        for pixel in self.pixels:
             pixel.unsetPlayer()
 
 
@@ -301,44 +308,46 @@ def connectStrand(things):
     return things
 
 def refillPowerups(count):
-	# Find existing powerups
-	existingCount = 0
-	for line in lines:
-		for pixel in line.pixels:
-			if pixel.powerup:
-				existingCount += 1
+    # Find existing powerups
+    existingCount = 0
+    for line in lines:
+        for pixel in line.pixels:
+            if pixel.powerup:
+                existingCount += 1
 
-	availableLines = []
-	for line in lines
-		available = len(line.pixels) >= 3
+    availableLines = []
+    for line in lines:
+        available = len(line.pixels) >= 3
         for pixel in line.pixels:
             available = available and pixel.player is None and pixel.powerup == False
         if available:
-	        availableLines.append(line)
-	random.shuffle(availableLines)
+            availableLines.append(line)
+    random.shuffle(availableLines)
 
-	for i in range(count - existingCount):
-	    if i < len(availableLines):
-	    	availableLines[i].pixels[random.randrange(1, len(availableLines[i].pixels)-1)].setPowerup()
-	  
+    for i in range(count - existingCount):
+        if i < len(availableLines):
+            availableLines[i].pixels[random.randrange(1, len(availableLines[i].pixels)-1)].setPowerup()
+      
 def resetGame():
-	# Clear board and reset players
-	for node in nodes:
-		node.pixel.reset()
-	for line in lines:
-		for pixel in line.pixels:
-			pixel.reset()
-	for player in players:
-		player.reset()
+    # Clear board and reset players
+    for node in nodes:
+        node.pixel.reset()
+    for line in lines:
+        for pixel in line.pixels:
+            pixel.reset()
+    for player in players:
+        player.reset()
 
 def endGame():
-	global gameRunning
-	gameRunning = False
-	pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 2000)
+    global gameRunning
+    gameRunning = False
+    pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 2000)
+    print("Game ended")
 
 def startGame():
-	global gameRunning
-	gameRunning = True
+    global gameRunning
+    gameRunning = True
+    print("Game started")
 
 ##
 
@@ -359,10 +368,10 @@ lines = [
 ]
 
 strands = [
-    connectStrand([lines[0], nodes[10], lines[1], nodes[5], lines[2], nodes[4], lines[3], nodes[1], lines[4], nodes[3], lines[5], nodes[9], lines[6], nodes[11], lines[7]]),
-    connectStrand([lines[8], nodes[11], lines[9], nodes[7], lines[10], nodes[12], lines[11], nodes[9], lines[12], nodes[8], lines[13], nodes[12], lines[14]]),
-    connectStrand([lines[15], nodes[10], lines[16], nodes[6], lines[17], nodes[4], lines[18], nodes[3], lines[19], nodes[2], lines[20], nodes[7], lines[21], nodes[8], lines[22]]),
-    connectStrand([lines[23], nodes[5], lines[24], nodes[2], lines[25], nodes[0], lines[26], nodes[1], lines[27], nodes[0], lines[28], nodes[6], lines[29]]),
+    connectStrand(list(reversed([lines[0], nodes[10], lines[1], nodes[5], lines[2], nodes[4], lines[3], nodes[1], lines[4], nodes[3], lines[5], nodes[9], lines[6], nodes[11], lines[7]]))),
+    connectStrand(list(reversed([lines[8], nodes[11], lines[9], nodes[7], lines[10], nodes[12], lines[11], nodes[9], lines[12], nodes[8], lines[13], nodes[12], lines[14]]))),
+    #connectStrand(list(reversed([lines[15], nodes[10], lines[16], nodes[6], lines[17], nodes[4], lines[18], nodes[3], lines[19], nodes[2], lines[20], nodes[7], lines[21], nodes[8], lines[22]]))),
+    #connectStrand([lines[23], nodes[5], lines[24], nodes[2], lines[25], nodes[0], lines[26], nodes[1], lines[27], nodes[0], lines[28], nodes[6], lines[29]]),
 ]
 
 startingNodes = [nodes[0], nodes[1]]
@@ -375,19 +384,19 @@ moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
 ### PLAYER CONFIG
 players = [
     Player(nodes[0], 1, [255,0,0], moves[0]),
-    Player(nodes[1], 2, [0,255,0], moves[1]),
-    Player(nodes[2], 3, [0,0,255], moves[2]),
-    Player(nodes[3], 4, [255,255,0], moves[3])
+    Player(nodes[5], 2, [0,255,0], moves[1]),
+    # Player(nodes[2], 3, [0,0,255], moves[2]),
+    # Player(nodes[3], 4, [255,255,0], moves[3])
 ]
 ###
 
 ### SERIAL CONFIG
 print("\n\n", [port.device for port in list_ports.comports()], "\n\n")
-ser = serial.Serial('/dev/cu.wchusbserial1460', 115200)
+ser = serial.Serial('/dev/cu.usbmodem1441', 115200)
 ###
 
 ### MISC DECLARATIONS
-USEREVENT_ENDGAME_COMPLETE = USEREVENT+1
+USEREVENT_ENDGAME_COMPLETE = pygame.USEREVENT+1
 
 gameRunning = False
 ###
@@ -398,33 +407,37 @@ gameRunning = False
 time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
 
 while True:
+    screen.fill(pygame.Color('black'))
+    screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (50, 50))
+    pygame.display.flip()
+
     clock.tick(30)
 
     if gameRunning:
         for player in players:
             player.update()
 
-    	refillPowerups(4)
+        refillPowerups(4)
 
-    	# Game over?
-    	livingPlayers = list(filter(lambda player: player.alive, players))
-    	if (livingPlayers <= 1):
-    		endGame()
+        # Game over?
+        livingPlayers = list(filter(lambda player: player.alive, players))
+        if (len(livingPlayers) <= 1):
+            endGame()
     else:
-    	for player in players:
-    		player.updateOutOfGame()
+        for player in players:
+            player.updateOutOfGame()
 
-    	# Start game?
-    	joinedPlayers = list(filter(lambda player: player.alive, players))
-    	if len(joinedPlayers) > 0:
-    		readyPlayers = list(filter(lambda player: player.ready, joinedPlayers))
-    		if len(readyPlayers) == len(joinedPlayers) or len(joinedPlayers) == len(players):
-    			startGame()
+        # Start game?
+        joinedPlayers = list(filter(lambda player: player.alive, players))
+        if len(joinedPlayers) > 0:
+            readyPlayers = list(filter(lambda player: player.ready, joinedPlayers))
+            if len(readyPlayers) == len(joinedPlayers) or len(joinedPlayers) == len(players):
+                startGame()
 
     for event in pygame.event.get():
-    	if event.type == USEREVENT_ENDGAME_COMPLETE
-    		pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 0)
-    		resetGame()
+        if event.type == USEREVENT_ENDGAME_COMPLETE:
+            pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 0)
+            resetGame()
         # if event.type == pygame.KEYDOWN:
         #     if event.key == pygame.K_TAB:
         #         player.advanceNodeExit()
@@ -433,8 +446,10 @@ while True:
 
     for strand in strands:
         pixelData = [pixel.getData() for pixel in getStrandPixels(strand)]
-        print(pixelData)
         ser.write(bytes(pixelData))
         ser.flush()
+
+        #print(pixelData)
         #print(ser.readline())
+        ser.readline()
 

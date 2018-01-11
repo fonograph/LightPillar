@@ -9,8 +9,8 @@
 
 Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 6, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 7, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 8, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 9, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 8, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip4 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 9, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel strips[] = {strip1, strip2, strip3, strip4};
 
 byte stripIndex = 0;
@@ -45,12 +45,12 @@ void loop() {
     if (bufferIndex == PIXELS_PER_STRIP) {
       updateStrip(&strips[stripIndex], buffer);    
       //Serial.write(buffer, 30);   
+      Serial.println(stripIndex); // Newline is the ACK required by the python end
       bufferIndex = 0;
       stripIndex++;
       if (stripIndex == STRIP_COUNT) {
         stripIndex = 0;
       }
-      Serial.println(""); // Newline is the ACK required by the python end
     }
   }
 }
