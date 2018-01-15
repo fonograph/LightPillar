@@ -7,10 +7,10 @@
 #define PIXELS_PER_STRIP 60
 #define STRIP_COUNT 4
 
-Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 6, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 7, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 8, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip4 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 9, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 5, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 6, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 9, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip4 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 10, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel strips[] = {strip1, strip2, strip3, strip4};
 
 byte stripIndex = 0;
@@ -65,17 +65,17 @@ void updateStrip(Adafruit_NeoPixel* strip, byte* data) {
     if (color == 0) {
       strip->setPixelColor(i, strip->Color(0, 0, 0));
     } else if (color == 1) {
-      strip->setPixelColor(i, strip->Color(alpha/4, 0, 0));
+      strip->setPixelColor(i, strip->Color(alpha/4, 0, alpha*0.5/4));
     } else if (color == 2) {
-      strip->setPixelColor(i, strip->Color(0, alpha/4, 0));
+      strip->setPixelColor(i, strip->Color(alpha/4, alpha*0.3/4, 0));
     } else if (color == 3) {
-      strip->setPixelColor(i, strip->Color(0, 0, alpha/4));
+      strip->setPixelColor(i, strip->Color(0, alpha/4, alpha/4));
     } else if (color == 4) {
-      strip->setPixelColor(i, strip->Color(alpha/4, alpha/4, 0));
+      strip->setPixelColor(i, strip->Color(alpha*0.5/4, alpha/4, 0));
     } else if (color == 5) {
       strip->setPixelColor(i, strip->Color(alpha/8, alpha/8, alpha/8));
     } else if (color == 6) {
-      strip->setPixelColor(i, strip->Color(0, alpha/4, alpha/4));
+      strip->setPixelColor(i, strip->Color(0, 0, alpha/4));
     }
   }
   strip->show();

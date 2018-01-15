@@ -8,6 +8,8 @@ import sys
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
 
+pygame.mixer.pre_init(44100, -16, 2, 2048)
+pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
 screen = pygame.display.set_mode((320, 240))
@@ -93,19 +95,17 @@ class Pixel(object):
     def setPlayer(self, player, alpha):
         self.player = player
         self.color = player.color
-        self.alpha = alpha
+        self.alpha = max(pow(alpha, 2), 0.05)
 
     def unsetPlayer(self):
         self.player = None
         self.color = 0
 
     def setLinePointer(self, color):
-        self.colorOverride = 5
-        self.alphaOverride = 1
+        self.setOverride(5, 1)
 
     def unsetLinePointer(self, color):
-        self.colorOverride = None
-        self.alphaOverride = None
+        self.unsetOverride()
 
     def setPowerup(self):
         self.powerup = True
@@ -116,20 +116,29 @@ class Pixel(object):
         self.powerup = False
         self.color = 0
 
+    def setOverride(self, color, alpha):
+        self.colorOverride = color
+        self.alphaOverride = alpha
+
+    def unsetOverride(self):
+        self.colorOverride = None
+        self.alphaOverride = None
+
     def pulse(self):
-        self.alpha = 0.5 + (self.pulseTicker % 100)/200
-        self.pulseTicker += 1
+        self.alpha = pow(0.1 + (self.pulseTicker % 100)/100*0.9, 2)
+        self.pulseTicker += 6
         # This does not need to be "undone" when a player leaves this pixel, because setPlayer is set on every pixel in a player's length on every frame
 
 ##
 
 class Player(object):
 
-    def __init__(self, startingNode, colorId, colorValue, move):
+    def __init__(self, startingNode, colorId, colorValue, move, nodeExitSound):
         self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
         self.move = move
+        self.nodeExitSound = nodeExitSound
         self.reset()
 
     def reset(self):
@@ -230,11 +239,19 @@ class Player(object):
             self.currentNode = None
             self.moveAccum = 0
             self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
+            self.nodeExitSound.play()
 
     def powerup(self):
         self.length += 2
         self.moveMultiplier = 2
         self.movesBeforeMultiplierReset = 10
+        collectSound.play()
+
+        global beatSpeed
+        beatSpeed -= 20
+        if beatSpeed < 200:
+            beatSpeed = 200
+        pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
 
     def kill(self):
         print("Dead")
@@ -242,10 +259,12 @@ class Player(object):
         self.removeFromAllPixels()
         self.move.set_leds(0, 0, 0)
         self.move.update_leds()
+        deathSound.play()
 
     def collideWith(self, player):
         if self.pixels[-1] == player.pixels[-1]: 
             # head on collision
+            print("Head on collision")
             if self.length >= player.length:
                 player.kill()
             if self.length <= player.length:
@@ -254,6 +273,8 @@ class Player(object):
             self.kill()
 
     def advanceToPixel(self, newPixel):
+        self.pixels.append(newPixel);
+
         # Collision?
         if newPixel.player is not None and newPixel.player != self:
             self.collideWith(newPixel.player)
@@ -264,8 +285,6 @@ class Player(object):
         if newPixel.powerup:
             self.powerup()
             newPixel.unsetPowerup()
-
-        self.pixels.append(newPixel);
 
         if (len(self.pixels) > self.length):
             self.pixels[0].unsetPlayer()
@@ -280,6 +299,12 @@ class Player(object):
 
 
 ##
+
+def getAllPixels():
+    px = []
+    for s in strands:
+        px += getStrandPixels(s)
+    return px
 
 def getStrandPixels(strand):
     pixels = []
@@ -330,6 +355,12 @@ def refillPowerups(count):
       
 def resetGame():
     # Clear board and reset players
+    global gameRunning
+    global gameEnded
+    global powerupCount
+    gameRunning = False
+    gameEnded = False
+    powerupCount = 0
     for node in nodes:
         node.pixel.reset()
     for line in lines:
@@ -338,16 +369,56 @@ def resetGame():
     for player in players:
         player.reset()
 
-def endGame():
-    global gameRunning
-    gameRunning = False
-    pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 2000)
+def endGame(winners):
     print("Game ended")
+    global gameEnded
+    global blinkColor
+    gameEnded = True
+    pygame.time.set_timer(USEREVENT_BEAT, 0)
+    if len(winners):
+        blinkColor = winners[0].color
+        winSound.play()
+    else:
+        blinkColor = 0
+        loseSound.play()
+    # Let the last death linger for a second
+    pygame.time.set_timer(USEREVENT_ENDGAME_START, 600)
+
+def endGamePart2():
+    # Then flash for a bit
+    pygame.time.set_timer(USEREVENT_BLINK, 400)
+    pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 5000)
 
 def startGame():
+    print("Game started")
     global gameRunning
     gameRunning = True
-    print("Game started")
+    startSound.play()
+    pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
+
+def startGamePart2():
+    global beatSpeed
+    global powerupCount
+    beatSpeed = 700
+    pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
+    powerupCount = 8   
+
+
+blinkCounter = 0
+blinkColor = 0
+def blink():
+    global blinkCounter
+    blinkCounter += 1
+    for i, pixel in enumerate(getAllPixels()):
+        pixel.setOverride(0 if blinkCounter%2==i%2 else blinkColor, 0.5)
+
+beatCounter = 0
+beatSpeed = 0
+def beat():
+    global beatCounter
+    beatCounter += 1
+    beatSounds[beatCounter % len(beatSounds)].play()
+
 
 ##
 
@@ -370,8 +441,8 @@ lines = [
 strands = [
     connectStrand(list(reversed([lines[0], nodes[10], lines[1], nodes[5], lines[2], nodes[4], lines[3], nodes[1], lines[4], nodes[3], lines[5], nodes[9], lines[6], nodes[11], lines[7]]))),
     connectStrand(list(reversed([lines[8], nodes[11], lines[9], nodes[7], lines[10], nodes[12], lines[11], nodes[9], lines[12], nodes[8], lines[13], nodes[12], lines[14]]))),
-    #connectStrand(list(reversed([lines[15], nodes[10], lines[16], nodes[6], lines[17], nodes[4], lines[18], nodes[3], lines[19], nodes[2], lines[20], nodes[7], lines[21], nodes[8], lines[22]]))),
-    #connectStrand([lines[23], nodes[5], lines[24], nodes[2], lines[25], nodes[0], lines[26], nodes[1], lines[27], nodes[0], lines[28], nodes[6], lines[29]]),
+    connectStrand(list(reversed([lines[15], nodes[10], lines[16], nodes[6], lines[17], nodes[4], lines[18], nodes[3], lines[19], nodes[2], lines[20], nodes[7], lines[21], nodes[8], lines[22]]))),
+    connectStrand([lines[23], nodes[5], lines[24], nodes[2], lines[25], nodes[0], lines[26], nodes[1], lines[27], nodes[0], lines[28], nodes[6], lines[29]]),
 ]
 
 startingNodes = [nodes[0], nodes[1]]
@@ -383,30 +454,50 @@ moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
 
 ### PLAYER CONFIG
 players = [
-    Player(nodes[0], 1, [255,0,0], moves[0]),
-    Player(nodes[5], 2, [0,255,0], moves[1]),
-    # Player(nodes[2], 3, [0,0,255], moves[2]),
-    # Player(nodes[3], 4, [255,255,0], moves[3])
+    Player(nodes[0], 1, [255,0,170], moves[0], pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
+    Player(nodes[5], 2, [255,170,0], moves[1], pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
+    Player(nodes[12], 4, [170,255,0], moves[2], pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
+    #Player(nodes[9], 3, [0,170,255], moves[3], pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
 ]
 ###
 
 ### SERIAL CONFIG
 print("\n\n", [port.device for port in list_ports.comports()], "\n\n")
-ser = serial.Serial('/dev/cu.usbmodem1441', 115200)
+ser = serial.Serial('/dev/cu.usbmodem1451', 115200)
 ###
+
+### SOUNDS
+beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
+deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
+collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
+startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
+winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
+loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
 
 ### MISC DECLARATIONS
-USEREVENT_ENDGAME_COMPLETE = pygame.USEREVENT+1
+USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
+USEREVENT_ENDGAME_START = pygame.USEREVENT+1
+USEREVENT_ENDGAME_COMPLETE = pygame.USEREVENT+2
+USEREVENT_BLINK = pygame.USEREVENT+3
+USEREVENT_BEAT = pygame.USEREVENT+4
 
+appRunning = True
 gameRunning = False
+gameEnded = False
+powerupCount = 0
 ###
+
+
+# Blink Test
+#blinkColor = 6
+#pygame.time.set_timer(USEREVENT_BLINK, 200)
 
 
 ### MAKE ROCKET GO
 
 time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
 
-while True:
+while appRunning:
     screen.fill(pygame.Color('black'))
     screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (50, 50))
     pygame.display.flip()
@@ -414,35 +505,51 @@ while True:
     clock.tick(30)
 
     if gameRunning:
-        for player in players:
-            player.update()
+        if not gameEnded:
+            for player in players:
+                player.update()
 
-        refillPowerups(4)
+            refillPowerups(powerupCount)
 
-        # Game over?
-        livingPlayers = list(filter(lambda player: player.alive, players))
-        if (len(livingPlayers) <= 1):
-            endGame()
+            # Game over?
+            livingPlayers = list(filter(lambda player: player.alive, players))
+            if (len(livingPlayers) <= 1):
+                endGame(livingPlayers)
     else:
         for player in players:
             player.updateOutOfGame()
 
         # Start game?
         joinedPlayers = list(filter(lambda player: player.alive, players))
-        if len(joinedPlayers) > 0:
+        if len(joinedPlayers) >= 2:
             readyPlayers = list(filter(lambda player: player.ready, joinedPlayers))
-            if len(readyPlayers) == len(joinedPlayers) or len(joinedPlayers) == len(players):
+            if len(readyPlayers) == len(joinedPlayers): #or len(joinedPlayers) == len(players):
                 startGame()
 
     for event in pygame.event.get():
-        if event.type == USEREVENT_ENDGAME_COMPLETE:
+        if event.type == USEREVENT_STARTGAME_COMPLETE:
+            pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, 0)
+            startGamePart2()
+
+        elif event.type == USEREVENT_ENDGAME_START:
+            pygame.time.set_timer(USEREVENT_ENDGAME_START, 0)
+            endGamePart2()
+
+        elif event.type == USEREVENT_ENDGAME_COMPLETE:
             pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 0)
+            pygame.time.set_timer(USEREVENT_BLINK, 0)
             resetGame()
-        # if event.type == pygame.KEYDOWN:
-        #     if event.key == pygame.K_TAB:
-        #         player.advanceNodeExit()
-        #     elif event.key == pygame.K_SPACE:
-        #         player.goNodeExit()
+
+        elif event.type == USEREVENT_BLINK:
+            blink()
+
+        elif event.type == USEREVENT_BEAT:
+            beat()
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                appRunning = False
+       
 
     for strand in strands:
         pixelData = [pixel.getData() for pixel in getStrandPixels(strand)]
