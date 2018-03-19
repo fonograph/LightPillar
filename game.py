@@ -297,6 +297,28 @@ class Player(object):
         for pixel in self.pixels:
             pixel.unsetPlayer()
 
+##
+
+class Strand(object):
+
+    def __init__(self, pixelCount):
+        self.pixelCount = pixelCount # all pixels including nodes
+        self.things = [Line(pixelCount)]
+        
+    def insertNode(pixelIndex, node):
+        line = None
+        lineStart = 0
+        i = 0
+        while line is None:
+            if lineStart + len(self.things[i].pixels) > pixelIndex:
+                line = self.things[i]
+            else:
+                lineStart += len(self.things[i].pixels)
+                i += 1
+        line1 = Line(pixelIndex - lineStart)
+        line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
+        self.things = self.things[:i] + [line1, node, line2] + self.things[i+1:]
+        
 
 ##
 
@@ -306,31 +328,14 @@ def getAllPixels():
         px += getStrandPixels(s)
     return px
 
-def getStrandPixels(strand):
-    pixels = []
-    for thing in strand:
-        pixels += thing.pixels
-    return pixels
+def createNode(*args):
+    node = Node()
+    for i in range(0, len(args), 2):
+        strand = args[i]
+        position = args[i+1]
+        strand.insertNode(position, node)
 
-
-def connectStrand(things):
-    for i in range(1, len(things)-1, 2):
-        line1 = things[i-1]
-        node = things[i]
-        line2 = things[i+1]
-
-        line1.node2 = node
-        line2.node1 = node
-        node.addLine(line1)
-        node.addLine(line2)
-
-    startingLine = things[0]
-    endingLine = things[-1]
-
-    startingLine.line1 = endingLine
-    endingLine.line2 = startingLine
-
-    return things
+    
 
 def refillPowerups(count):
     # Find existing powerups
@@ -424,28 +429,10 @@ def beat():
 
 
 ### BOARD CONFIG
-nodes = [Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node(), Node()]
-lines = [
-    # 0
-    Line(8), Line(8), Line(3), Line(11), Line(3), Line(11), Line(3), Line(6),
-    # 8
-    Line(3), Line(14), Line(20), Line(5), Line(8), Line(2), Line(2),
-    # 15
-    Line(3), Line(6), Line(8), Line(2), Line(21), Line(9), Line(2), Line(2),
-    # 23
-    Line(4), Line(3), Line(14), Line(3), Line(14), Line(7), Line(9)
+strands = [Strand(30), Strand(30)]
+createNode(strands[0], 10, strands[1], 20)
 
 
-]
-
-strands = [
-    connectStrand(list(reversed([lines[0], nodes[10], lines[1], nodes[5], lines[2], nodes[4], lines[3], nodes[1], lines[4], nodes[3], lines[5], nodes[9], lines[6], nodes[11], lines[7]]))),
-    connectStrand(list(reversed([lines[8], nodes[11], lines[9], nodes[7], lines[10], nodes[12], lines[11], nodes[9], lines[12], nodes[8], lines[13], nodes[12], lines[14]]))),
-    connectStrand(list(reversed([lines[15], nodes[10], lines[16], nodes[6], lines[17], nodes[4], lines[18], nodes[3], lines[19], nodes[2], lines[20], nodes[7], lines[21], nodes[8], lines[22]]))),
-    connectStrand([lines[23], nodes[5], lines[24], nodes[2], lines[25], nodes[0], lines[26], nodes[1], lines[27], nodes[0], lines[28], nodes[6], lines[29]]),
-]
-
-startingNodes = [nodes[0], nodes[1]]
 ### 
 
 ### PSMOVE CONFIG
