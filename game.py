@@ -12,7 +12,7 @@ pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
-screen = pygame.display.set_mode((320, 240))
+screen = pygame.display.set_mode((1000, 800))
 font = pygame.font.Font(None, 30)
 
 ##
@@ -299,13 +299,32 @@ class Player(object):
 
 ##
 
+VIZ_COLORS = [
+    (0,0,0),
+    (255,0,170),
+    (255,170,0),
+    (0,170,255),
+    (170,255,0),
+    (255,255,255),
+    (0,0,255)
+]
+
 class Strand(object):
 
-    def __init__(self, pixelCount):
+    def __init__(self, pixelCount, vizStart, vizEnd):
         self.pixelCount = pixelCount # all pixels including nodes
         self.things = [Line(pixelCount)]
+
+        self.vizStart = vizStart
+        self.vizEnd = vizEnd
+
+    def getPixels(self):
+        px = []
+        for thing in self.things:
+            px += thing.pixels
+        return px
         
-    def insertNode(pixelIndex, node):
+    def insertNode(self, pixelIndex, node):
         line = None
         lineStart = 0
         i = 0
@@ -318,6 +337,16 @@ class Strand(object):
         line1 = Line(pixelIndex - lineStart)
         line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
         self.things = self.things[:i] + [line1, node, line2] + self.things[i+1:]
+
+    def renderViz(self, screen):
+        pygame.draw.line(screen, (255, 255, 255), self.vizStart, self.vizEnd, 20)
+        pxStart = self.vizStart
+        pxVector = [self.vizEnd[0]-self.vizStart[0], self.vizEnd[1]-self.vizStart[1]]
+        pixels = self.getPixels()
+        for i, pixel in enumerate(pixels):
+            dist = i / (len(pixels)-1)
+            pygame.draw.circle(screen, VIZ_COLORS[pixel.color], [int(pxStart[0] + dist*pxVector[0]), int(pxStart[1] + dist*pxVector[1])], 5)
+
         
 
 ##
@@ -429,7 +458,10 @@ def beat():
 
 
 ### BOARD CONFIG
-strands = [Strand(30), Strand(30)]
+strands = [
+    Strand(30, [50, 50], [500, 50]), 
+    Strand(30, [50, 110], [500, 110])
+]
 createNode(strands[0], 10, strands[1], 20)
 
 
@@ -441,16 +473,20 @@ moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
 
 ### PLAYER CONFIG
 players = [
-    Player(nodes[0], 1, [255,0,170], moves[0], pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
-    Player(nodes[5], 2, [255,170,0], moves[1], pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
-    Player(nodes[12], 4, [170,255,0], moves[2], pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
-    #Player(nodes[9], 3, [0,170,255], moves[3], pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
+    #Player(nodes[0], 1, [255,0,170], moves[0], pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
+    #Player(nodes[5], 2, [255,170,0], moves[1], pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
+    #Player(nodes[9], 3, [0,170,255], moves[2], pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
+    #Player(nodes[12], 4, [170,255,0], moves[3], pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
 ###
 
 ### SERIAL CONFIG
 print("\n\n", [port.device for port in list_ports.comports()], "\n\n")
-ser = serial.Serial('/dev/cu.usbmodem1451', 115200)
+ser = None
+try:
+    ser = serial.Serial('/dev/cu.usbmodem1451', 115200)
+except:
+    ser = None
 ###
 
 ### SOUNDS
@@ -486,7 +522,9 @@ time.sleep(2) # the serial connection resets the arduino, so give the program ti
 
 while appRunning:
     screen.fill(pygame.Color('black'))
-    screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (50, 50))
+    for strand in strands:
+        strand.renderViz(screen)
+    screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
     pygame.display.flip()
 
     clock.tick(30)
@@ -539,11 +577,12 @@ while appRunning:
        
 
     for strand in strands:
-        pixelData = [pixel.getData() for pixel in getStrandPixels(strand)]
-        ser.write(bytes(pixelData))
-        ser.flush()
+        pixelData = [pixel.getData() for pixel in strand.getPixels()]
+        if ser is not None:
+            ser.write(bytes(pixelData))
+            ser.flush()
 
-        #print(pixelData)
-        #print(ser.readline())
-        ser.readline()
+            #print(pixelData)
+            #print(ser.readline())
+            ser.readline()
 
