@@ -88,9 +88,15 @@ class Pixel(object):
         self.pulseTicker = 0;
 
     def getData(self):
-        color = self.color if self.colorOverride is None else self.colorOverride
-        alpha = self.alpha if self.alphaOverride is None else self.alphaOverride
+        color = self.getColor()
+        alpha = self.getAlpha()
         return (color << 5) + round(alpha*31)
+
+    def getColor(self):
+        return self.color if self.colorOverride is None else self.colorOverride
+
+    def getAlpha(self):
+        return self.alpha if self.alphaOverride is None else self.alphaOverride
 
     def setPlayer(self, player, alpha):
         self.player = player
@@ -133,11 +139,13 @@ class Pixel(object):
 
 class Player(object):
 
-    def __init__(self, startingNode, colorId, colorValue, move, nodeExitSound):
+    def __init__(self, startingNode, colorId, colorValue, move, key1, key2, nodeExitSound):
         self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
         self.move = move
+        self.key1 = key1
+        self.key2 = key2
         self.nodeExitSound = nodeExitSound
         self.reset()
 
@@ -158,20 +166,28 @@ class Player(object):
         #self.advanceToPixel(self.currentNode.pixel)
         #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
 
-        self.move.set_leds(0, 0, 0)
-        self.move.update_leds()
+        if self.move is not None:
+            self.move.set_leds(0, 0, 0)
+            self.move.update_leds()
 
-    def update(self):
+    def update(self, events):
         if not self.alive:
             return
 
         # Controls
-        while self.move.poll():
-            pressed, released = self.move.get_button_events()
-            if pressed & psmove.Btn_T:
-                self.goNodeExit()
-            elif pressed & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
-                self.advanceNodeExit()
+        if self.move is not None:
+            while self.move.poll():
+                pressed, released = self.move.get_button_events()
+                if pressed & psmove.Btn_T:
+                    self.goNodeExit()
+                elif pressed & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
+                    self.advanceNodeExit()
+        for event in events:
+            if event.type == pygame.KEYDOWN:
+                if event.key == self.key1:
+                    self.goNodeExit()
+                elif event.key == self.key2:
+                    self.advanceNodeExit()
 
         # Movement
         if self.currentLine is not None:
@@ -204,22 +220,32 @@ class Player(object):
         if self.currentNode is not None:
             self.currentNode.pulse()
 
-        self.move.update_leds()
+        if self.move is not None:
+            self.move.update_leds()
 
-    def updateOutOfGame(self):
-        while self.move.poll():
-            self.ready = self.move.get_trigger() > 0
-            pressed, released = self.move.get_button_events()
-            if (pressed & psmove.Btn_MOVE):
-                self.alive = not self.alive
-                if self.alive:
-                    self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
-                    self.advanceToPixel(self.currentNode.pixel)
-                else:
-                    self.move.set_leds(0, 0, 0)
-                    self.removeFromAllPixels()
-        self.move.update_leds()
-
+    def updateOutOfGame(self, events):
+        self.advanceToPixel(self.currentNode.pixel)
+        self.alive = True
+        if self.move is not None:
+            self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
+            # while self.move.poll():
+            #     self.ready = self.move.get_trigger() > 0
+            #     pressed, released = self.move.get_button_events()
+            #     if (pressed & psmove.Btn_MOVE):
+            #         self.alive = not self.alive
+            #         if self.alive:
+            #             self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
+            #             self.advanceToPixel(self.currentNode.pixel)
+            #         else:
+            #             self.move.set_leds(0, 0, 0)
+            #             self.removeFromAllPixels()
+            self.move.update_leds()
+        # for event in events:
+        #     if event.type == pygame.KEYDOWN:
+        #         if event.key == self.key1:
+        #             ...
+        #         elif event.key == self.key2:
+        #             ...
 
     def advanceNodeExit(self):
         if self.currentNode:
@@ -257,8 +283,9 @@ class Player(object):
         print("Dead")
         self.alive = False
         self.removeFromAllPixels()
-        self.move.set_leds(0, 0, 0)
-        self.move.update_leds()
+        if self.move is not None:
+            self.move.set_leds(0, 0, 0)
+            self.move.update_leds()
         deathSound.play()
 
     def collideWith(self, player):
@@ -323,6 +350,13 @@ class Strand(object):
         for thing in self.things:
             px += thing.pixels
         return px
+
+    def getLines(self):
+        lines = []
+        for thing in self.things:
+            if isinstance(thing, Line):
+                lines += [thing]
+        return lines
         
     def insertNode(self, pixelIndex, node):
         line = None
@@ -335,7 +369,11 @@ class Strand(object):
                 lineStart += len(self.things[i].pixels)
                 i += 1
         line1 = Line(pixelIndex - lineStart)
+        line1.node2 = node
         line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
+        line2.node1 = node
+        node.addLine(line1)
+        node.addLine(line2) #THIS IS THE PROBLEM, THE NODE IS GETTING LINES ADDED THAT MAY LATER GET CUT UP AND REPLACED
         self.things = self.things[:i] + [line1, node, line2] + self.things[i+1:]
 
     def renderViz(self, screen):
@@ -345,7 +383,7 @@ class Strand(object):
         pixels = self.getPixels()
         for i, pixel in enumerate(pixels):
             dist = i / (len(pixels)-1)
-            pygame.draw.circle(screen, VIZ_COLORS[pixel.color], [int(pxStart[0] + dist*pxVector[0]), int(pxStart[1] + dist*pxVector[1])], 5)
+            pygame.draw.circle(screen, VIZ_COLORS[pixel.getColor()], [int(pxStart[0] + dist*pxVector[0]), int(pxStart[1] + dist*pxVector[1])], 5)
 
         
 
@@ -354,8 +392,14 @@ class Strand(object):
 def getAllPixels():
     px = []
     for s in strands:
-        px += getStrandPixels(s)
+        px += s.getPixels()
     return px
+
+def getAllLines():
+    lines = []
+    for s in strands:
+        lines += s.getLines()
+    return lines
 
 def createNode(*args):
     node = Node()
@@ -363,19 +407,18 @@ def createNode(*args):
         strand = args[i]
         position = args[i+1]
         strand.insertNode(position, node)
-
+    return node
     
 
 def refillPowerups(count):
     # Find existing powerups
     existingCount = 0
-    for line in lines:
-        for pixel in line.pixels:
-            if pixel.powerup:
-                existingCount += 1
+    for pixel in getAllPixels():
+        if pixel.powerup:
+            existingCount += 1
 
     availableLines = []
-    for line in lines:
+    for line in getAllLines():
         available = len(line.pixels) >= 3
         for pixel in line.pixels:
             available = available and pixel.player is None and pixel.powerup == False
@@ -397,7 +440,7 @@ def resetGame():
     powerupCount = 0
     for node in nodes:
         node.pixel.reset()
-    for line in lines:
+    for line in getAllLines():
         for pixel in line.pixels:
             pixel.reset()
     for player in players:
@@ -460,23 +503,32 @@ def beat():
 ### BOARD CONFIG
 strands = [
     Strand(30, [50, 50], [500, 50]), 
-    Strand(30, [50, 110], [500, 110])
+    Strand(30, [50, 110], [500, 110]),
+    Strand(30, [50, 170], [500, 170])
 ]
-createNode(strands[0], 10, strands[1], 20)
+nodes = [
+    createNode(strands[0], 10, strands[1], 20),
+    createNode(strands[1], 10, strands[2], 20)
+]   
 
 
 ### 
 
 ### PSMOVE CONFIG
-moves = [psmove.PSMove(x) for x in range(psmove.count_connected())]
+moves = []
+for x in range(4):
+    if x < psmove.count_connected():
+        moves += [psmove.PSMove(x)]
+    else:
+        moves += [None]
 ###
 
 ### PLAYER CONFIG
 players = [
-    #Player(nodes[0], 1, [255,0,170], moves[0], pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
-    #Player(nodes[5], 2, [255,170,0], moves[1], pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
-    #Player(nodes[9], 3, [0,170,255], moves[2], pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
-    #Player(nodes[12], 4, [170,255,0], moves[3], pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
+    Player(nodes[0], 1, [255,0,170], moves[0], pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
+    Player(nodes[1], 2, [255,170,0], moves[1], pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
+    #Player(nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
+    #Player(nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
 ###
 
@@ -529,10 +581,12 @@ while appRunning:
 
     clock.tick(30)
 
+    events = pygame.event.get();
+
     if gameRunning:
         if not gameEnded:
             for player in players:
-                player.update()
+                player.update(events)
 
             refillPowerups(powerupCount)
 
@@ -542,7 +596,7 @@ while appRunning:
                 endGame(livingPlayers)
     else:
         for player in players:
-            player.updateOutOfGame()
+            player.updateOutOfGame(events)
 
         # Start game?
         joinedPlayers = list(filter(lambda player: player.alive, players))
@@ -551,7 +605,7 @@ while appRunning:
             if len(readyPlayers) == len(joinedPlayers): #or len(joinedPlayers) == len(players):
                 startGame()
 
-    for event in pygame.event.get():
+    for event in events:
         if event.type == USEREVENT_STARTGAME_COMPLETE:
             pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, 0)
             startGamePart2()
@@ -574,6 +628,9 @@ while appRunning:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 appRunning = False
+            if event.key == pygame.K_RETURN:
+                if gameRunning == False:
+                    startGame()
        
 
     for strand in strands:
