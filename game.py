@@ -2,9 +2,11 @@ import pygame
 import pygame.time
 import random
 import serial
+import json
 from serial.tools import list_ports
 import time
 import sys
+import math
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
 
@@ -12,7 +14,7 @@ pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
-screen = pygame.display.set_mode((1000, 800))
+screen = pygame.display.set_mode((1280, 960), pygame.FULLSCREEN|pygame.HWSURFACE)
 font = pygame.font.Font(None, 30)
 
 ##
@@ -27,8 +29,24 @@ class Node(object):
     def addLine(self, line):
         self.lines.append(line)
 
+    def replaceLine(self, oldLine, newLine):
+        self.lines = [line if (line != oldLine) else newLine for line in self.lines]
+
     def pulse(self):
         self.pixel.pulse()
+
+    def clearCaptures(self):
+        for pixel in self.pixels:
+            pixel.unsetCapture()
+        for line in self.lines:
+            line.clearCaptures()
+
+    def hasNoPlayers(self):
+        # also includes connected lines
+        result = True
+        for line in self.lines:
+            result = result and line.hasNoPlayers()
+        return result
 
 ##
 
@@ -71,6 +89,17 @@ class Line(object):
     def getFirstPixelIndexFromLine(self, line):
         return 0 if line == self.line2 else len(self.pixels)-1
 
+    def clearCaptures(self):
+        for pixel in self.pixels:
+            pixel.unsetCapture()
+
+    def hasNoPlayers(self):
+        result = True
+        for pixel in self.pixels:
+            result = result and pixel.player is None
+        return result
+
+
 ##
 
 class Pixel(object):
@@ -84,6 +113,8 @@ class Pixel(object):
         self.alpha = 0
         self.alphaOverride = None
         self.player = None
+        self.playerCapture = None
+        self.playerCapturePercent = 0
         self.powerup = False
         self.pulseTicker = 0;
 
@@ -100,11 +131,17 @@ class Pixel(object):
 
     def setPlayer(self, player, alpha):
         self.player = player
+        self.playerCapture = player
+        self.playerCapturePercent = 1
         self.color = player.color
-        self.alpha = max(pow(alpha, 2), 0.05)
+        self.alpha = alpha #max(pow(alpha, 2), 0.05)
 
     def unsetPlayer(self):
         self.player = None
+
+    def unsetCapture(self):
+        self.playerCapture = None
+        self.playerCapturePercent = 0
         self.color = 0
 
     def setLinePointer(self, color):
@@ -115,12 +152,11 @@ class Pixel(object):
 
     def setPowerup(self):
         self.powerup = True
-        self.color = 6
-        self.alpha = 1
+        self.setOverride(6, 1)        
 
     def unsetPowerup(self):
         self.powerup = False
-        self.color = 0
+        self.unsetOverride()
 
     def setOverride(self, color, alpha):
         self.colorOverride = color
@@ -130,10 +166,21 @@ class Pixel(object):
         self.colorOverride = None
         self.alphaOverride = None
 
-    def pulse(self):
-        self.alpha = pow(0.1 + (self.pulseTicker % 100)/100*0.9, 2)
-        self.pulseTicker += 6
-        # This does not need to be "undone" when a player leaves this pixel, because setPlayer is set on every pixel in a player's length on every frame
+    def update(self):
+        # fade from capture
+        minCapture = 0.5
+        fadeSpeed = 0.001
+        if self.playerCapture is not None and self.player is None:
+            self.playerCapturePercent -= fadeSpeed;
+            self.playerCapturePercent = max(self.playerCapturePercent, minCapture)
+            self.alpha = max(pow(self.playerCapturePercent, 2), 0.05)
+
+
+    def pulse(self, accum):
+        accum = accum % 200
+        if accum > 100:
+            accum = 200 - accum
+        self.alpha = max(pow(0.1 + accum/100*0.9, 2), 0.05)
 
 ##
 
@@ -150,27 +197,40 @@ class Player(object):
         self.reset()
 
     def reset(self):
-        self.currentLine = None
-        self.currentLineIndex = 0
-        self.currentLineDirection = 1
-        self.currentNode = self.startingNode
-        self.currentNodeExitIndex = 0
-        self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
-        self.moveMultiplier = 1
-        self.movesBeforeMultiplierReset = 0 
-        self.pixels = [self.startingNode.pixel] 
-        self.length = 1
-        self.alive = False
+        self.spawnAtNode(self.startingNode, False)
         self.ready = False # for starting the game
-
-        #self.advanceToPixel(self.currentNode.pixel)
-        #self.currentNode.lines[self.currentNodeExitIndex].setPointer(self.color, self.currentNode)
-
         if self.move is not None:
             self.move.set_leds(0, 0, 0)
             self.move.update_leds()
 
+    def spawnAtNode(self, node, alive):
+        self.currentLine = None
+        self.currentLineIndex = 0
+        self.currentLineDirection = 1
+        self.currentNode = node
+        self.currentNodeExitIndex = 0
+        self.moveAccum = 0  #ticks up per frame, and movement happens when it's high enough
+        self.moveMultiplier = 1
+        self.movesBeforeMultiplierReset = 0
+        self.visitedNodes = [node]
+        self.pixels = [node.pixel] 
+        self.length = 1
+        self.respawnAccum = 0
+        self.alive = alive
+        self.pulseAccum = 0
+
+        self.advanceToPixel(self.currentNode.pixel)
+
+
     def update(self, events):
+        if not self.alive:
+            self.respawnAccum += 1
+            if self.respawnAccum >= 100:
+                for node in reversed(self.visitedNodes):
+                    if node.hasNoPlayers:
+                        self.spawnAtNode(node, True)
+                        break
+        
         if not self.alive:
             return
 
@@ -191,17 +251,35 @@ class Player(object):
 
         # Movement
         if self.currentLine is not None:
-            self.moveAccum += 5 * self.moveMultiplier
-            if (self.moveAccum >= 20):
-                self.moveAccum -= 20
-                self.currentLineIndex += self.currentLineDirection
-                atConnection = self.currentLine.isIndexAtConnection(self.currentLineIndex)
+            self.moveAccum += 3 * self.moveMultiplier
+
+            # determine next position
+            nextLineIndex = self.currentLineIndex + self.currentLineDirection
+            atConnection = self.currentLine.isIndexAtConnection(nextLineIndex)
+            if atConnection is None:
+                nextPixel = self.currentLine.pixels[nextLineIndex]
+            elif isinstance(atConnection, Line):
+                nextLine = atConnection
+                nextPixel = nextLine.pixels[nextLine.getFirstPixelIndexFromLine(self.currentLine)]
+            elif isinstance(atConnection, Node):
+                nextNode = atConnection
+                nextPixel = nextNode.pixel
+
+            targetAccum = 20
+            if nextPixel.playerCapture is not None and nextPixel.playerCapture != self:
+                targetAccum += nextPixel.playerCapturePercent * 20
+
+            if (self.moveAccum >= targetAccum):
+                self.moveAccum -= targetAccum
+
                 if atConnection is None:
+                    self.currentLineIndex = nextLineIndex
                     self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
                 elif isinstance(atConnection, Line):
+                    lastLine = self.currentLine
                     self.currentLine = atConnection
-                    self.currentLineDirection = self.currentLine.getDirectionFromLine(self.currentNode)
-                    self.currentLineIndex = self.currentLine.getFirstPixelIndexFromLine(self.currentNode)
+                    self.currentLineDirection = self.currentLine.getDirectionFromLine(lastLine)
+                    self.currentLineIndex = self.currentLine.getFirstPixelIndexFromLine(lastLine)
                     self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
                 elif isinstance(atConnection, Node):
                     # Arrive at node
@@ -210,15 +288,17 @@ class Player(object):
                     self.currentNodeExitIndex = -1
                     self.moveAccum = 0
                     self.advanceToPixel(self.currentNode.pixel)
+                    if self.alive:
+                        # if you died on the move don't count it as a visit
+                        self.visitedNodes.append(self.currentNode)
 
                 if self.movesBeforeMultiplierReset > 0:
                     self.movesBeforeMultiplierReset -= 1
                     if self.movesBeforeMultiplierReset == 0:
                         self.moveMultiplier = 1
 
-        # Staying still at a node
-        if self.currentNode is not None:
-            self.currentNode.pulse()
+        self.pulseAccum += 6
+        self.pixels[0].pulse(self.pulseAccum)
 
         if self.move is not None:
             self.move.update_leds()
@@ -268,7 +348,7 @@ class Player(object):
             self.nodeExitSound.play()
 
     def powerup(self):
-        self.length += 2
+        #self.length += 2
         self.moveMultiplier = 2
         self.movesBeforeMultiplierReset = 10
         collectSound.play()
@@ -282,6 +362,7 @@ class Player(object):
     def kill(self):
         print("Dead")
         self.alive = False
+        self.respawnAccum = 0
         self.removeFromAllPixels()
         if self.move is not None:
             self.move.set_leds(0, 0, 0)
@@ -289,15 +370,21 @@ class Player(object):
         deathSound.play()
 
     def collideWith(self, player):
-        if self.pixels[-1] == player.pixels[-1]: 
-            # head on collision
-            print("Head on collision")
-            if self.length >= player.length:
-                player.kill()
-            if self.length <= player.length:
-                self.kill()
+        self.kill()
+        player.kill()
+        if self.currentLine is not None:
+            self.currentLine.clearCaptures()
         else:
-            self.kill()
+            self.currentNode.clearCaptures()
+
+        # if self.pixels[-1] == player.pixels[-1]: 
+        #     # head on collision
+        #     if self.length >= player.length:
+        #         player.kill()
+        #     if self.length <= player.length:
+        #         self.kill()
+        # else:
+        #     self.kill()
 
     def advanceToPixel(self, newPixel):
         self.pixels.append(newPixel);
@@ -338,12 +425,12 @@ VIZ_COLORS = [
 
 class Strand(object):
 
-    def __init__(self, pixelCount, vizStart, vizEnd):
+    def __init__(self, pixelCount, vizLayout):
         self.pixelCount = pixelCount # all pixels including nodes
         self.things = [Line(pixelCount)]
 
-        self.vizStart = vizStart
-        self.vizEnd = vizEnd
+        self.vizStart = vizLayout[0]
+        self.vizEnd = vizLayout[1]
 
     def getPixels(self):
         px = []
@@ -368,13 +455,28 @@ class Strand(object):
             else:
                 lineStart += len(self.things[i].pixels)
                 i += 1
+
+        newThings = [node]
+
         line1 = Line(pixelIndex - lineStart)
-        line1.node2 = node
+        if len(line1.pixels) > 0:
+            line1.node2 = node
+            if line.node1 is not None:
+                line1.node1 = line.node1
+                line.node1.replaceLine(line, line1)
+            node.addLine(line1)
+            newThings = [line1] + newThings
+
         line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
-        line2.node1 = node
-        node.addLine(line1)
-        node.addLine(line2) #THIS IS THE PROBLEM, THE NODE IS GETTING LINES ADDED THAT MAY LATER GET CUT UP AND REPLACED
-        self.things = self.things[:i] + [line1, node, line2] + self.things[i+1:]
+        if len(line2.pixels) > 0:
+            line2.node1 = node
+            if line.node2 is not None:
+                line2.node2 = line.node2
+                line.node2.replaceLine(line, line2)
+            node.addLine(line2) 
+            newThings = newThings + [line2]
+
+        self.things = self.things[:i] + newThings + self.things[i+1:]
 
     def renderViz(self, screen):
         pygame.draw.line(screen, (255, 255, 255), self.vizStart, self.vizEnd, 20)
@@ -383,11 +485,51 @@ class Strand(object):
         pixels = self.getPixels()
         for i, pixel in enumerate(pixels):
             dist = i / (len(pixels)-1)
-            pygame.draw.circle(screen, VIZ_COLORS[pixel.getColor()], [int(pxStart[0] + dist*pxVector[0]), int(pxStart[1] + dist*pxVector[1])], 5)
+            color = VIZ_COLORS[pixel.getColor()]
+            alpha = pixel.getAlpha() # ** 0.3
+            color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
+            pygame.draw.circle(screen, color, [int(pxStart[0] + dist*pxVector[0]), int(pxStart[1] + dist*pxVector[1])], 5)
 
         
 
 ##
+
+class StrandLayoutManager(object):
+
+    def __init__(self):
+        self.data = json.load(open('layout.json'))
+        self.activeStrand = None
+        self.activeStrandEnd = None # 0 or 1 for start or end
+
+    def save(self):
+        data = []
+        for strand in strands:
+            data += [[strand.vizStart, strand.vizEnd]]
+        json.dump(data, open('layout.json', 'w'))
+
+    def handleMouseDown(self, pos):
+        for strand in strands:
+            if math.sqrt((pos[0]-strand.vizStart[0])**2 + (pos[1]-strand.vizStart[1])**2) < 15:
+                self.activeStrand = strand
+                self.activeStrandEnd = 0
+            if math.sqrt((pos[0]-strand.vizEnd[0])**2 + (pos[1]-strand.vizEnd[1])**2) < 15:
+                self.activeStrand = strand
+                self.activeStrandEnd = 1
+
+    def handleMouseUp(self):
+        self.activeStrand = None
+        self.save()
+
+    def handleMouseMove(self, pos):
+        if self.activeStrand is not None:
+            if self.activeStrandEnd == 0:
+                self.activeStrand.vizStart = pos
+            else:
+                self.activeStrand.vizEnd = pos
+
+
+
+## 
 
 def getAllPixels():
     px = []
@@ -452,14 +594,14 @@ def endGame(winners):
     global blinkColor
     gameEnded = True
     pygame.time.set_timer(USEREVENT_BEAT, 0)
-    if len(winners):
-        blinkColor = winners[0].color
-        winSound.play()
-    else:
-        blinkColor = 0
-        loseSound.play()
+    # if len(winners):
+    #     blinkColor = winners[0].color
+    #     winSound.play()
+    # else:
+    #     blinkColor = 0
+    #     loseSound.play()
     # Let the last death linger for a second
-    pygame.time.set_timer(USEREVENT_ENDGAME_START, 600)
+    # pygame.time.set_timer(USEREVENT_ENDGAME_START, 600)
 
 def endGamePart2():
     # Then flash for a bit
@@ -470,14 +612,16 @@ def startGame():
     print("Game started")
     global gameRunning
     gameRunning = True
-    startSound.play()
-    pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
+    startGamePart2()
+    #startSound.play()
+    #pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
 
 def startGamePart2():
     global beatSpeed
     global powerupCount
     beatSpeed = 700
     pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
+    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 10000)
     powerupCount = 8   
 
 
@@ -501,14 +645,19 @@ def beat():
 
 
 ### BOARD CONFIG
+layout = StrandLayoutManager()
+
 strands = [
-    Strand(30, [50, 50], [500, 50]), 
-    Strand(30, [50, 110], [500, 110]),
-    Strand(30, [50, 170], [500, 170])
+    Strand([30, 30, 30, 30], layout.data[0]), 
+    Strand(30, layout.data[1]),
+    Strand(30, layout.data[2]),
+    Strand(30, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 10, strands[1], 20),
-    createNode(strands[1], 10, strands[2], 20)
+    createNode(strands[0], 29, strands[0], 30),
+    createNode(strands[0], 29, strands[2], 0),
+    createNode(strands[3], 0, strands[1], 29),
+    createNode(strands[3], 29, strands[2], 29),
 ]   
 
 
@@ -551,6 +700,7 @@ loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
 
 ### MISC DECLARATIONS
 USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
+USEREVENT_GAME_COMPLETE = pygame.USEREVENT+6
 USEREVENT_ENDGAME_START = pygame.USEREVENT+1
 USEREVENT_ENDGAME_COMPLETE = pygame.USEREVENT+2
 USEREVENT_BLINK = pygame.USEREVENT+3
@@ -563,10 +713,6 @@ powerupCount = 0
 ###
 
 
-# Blink Test
-#blinkColor = 6
-#pygame.time.set_timer(USEREVENT_BLINK, 200)
-
 
 ### MAKE ROCKET GO
 
@@ -575,7 +721,7 @@ time.sleep(2) # the serial connection resets the arduino, so give the program ti
 while appRunning:
     screen.fill(pygame.Color('black'))
     for strand in strands:
-        strand.renderViz(screen)
+       strand.renderViz(screen)
     screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
     pygame.display.flip()
 
@@ -588,12 +734,15 @@ while appRunning:
             for player in players:
                 player.update(events)
 
+            for pixel in getAllPixels():
+                pixel.update()
+
             refillPowerups(powerupCount)
 
             # Game over?
-            livingPlayers = list(filter(lambda player: player.alive, players))
-            if (len(livingPlayers) <= 1):
-                endGame(livingPlayers)
+            # livingPlayers = list(filter(lambda player: player.alive, players))
+            # if (len(livingPlayers) <= 1):
+            #     endGame(livingPlayers)
     else:
         for player in players:
             player.updateOutOfGame(events)
@@ -609,6 +758,9 @@ while appRunning:
         if event.type == USEREVENT_STARTGAME_COMPLETE:
             pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, 0)
             startGamePart2()
+
+        elif event.type == USEREVENT_GAME_COMPLETE:
+            endGame([])
 
         elif event.type == USEREVENT_ENDGAME_START:
             pygame.time.set_timer(USEREVENT_ENDGAME_START, 0)
@@ -631,6 +783,14 @@ while appRunning:
             if event.key == pygame.K_RETURN:
                 if gameRunning == False:
                     startGame()
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            layout.handleMouseDown(event.pos)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            layout.handleMouseUp()
+        elif event.type == pygame.MOUSEMOTION:
+            layout.handleMouseMove(event.pos)
+
        
 
     for strand in strands:
