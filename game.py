@@ -429,8 +429,7 @@ class Strand(object):
         self.pixelCount = pixelCount # all pixels including nodes
         self.things = [Line(pixelCount)]
 
-        self.vizStart = vizLayout[0]
-        self.vizEnd = vizLayout[1]
+        self.vizPoints = vizLayout
 
     def getPixels(self):
         px = []
@@ -479,16 +478,21 @@ class Strand(object):
         self.things = self.things[:i] + newThings + self.things[i+1:]
 
     def renderViz(self, screen):
-        pygame.draw.line(screen, (255, 255, 255), self.vizStart, self.vizEnd, 20)
-        pxStart = self.vizStart
-        pxVector = [self.vizEnd[0]-self.vizStart[0], self.vizEnd[1]-self.vizStart[1]]
-        pixels = self.getPixels()
-        for i, pixel in enumerate(pixels):
-            dist = i / (len(pixels)-1)
-            color = VIZ_COLORS[pixel.getColor()]
-            alpha = pixel.getAlpha() # ** 0.3
-            color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
-            pygame.draw.circle(screen, color, [int(pxStart[0] + dist*pxVector[0]), int(pxStart[1] + dist*pxVector[1])], 5)
+        pixelIndex = 0
+        for j in range(len(self.vizPoints)-1):
+            start = self.vizPoints[j]
+            end = self.vizPoints[j+1]
+            vector = [end[0]-start[0], end[1]-start[1]]
+            pixelEndIndex = pixelIndex + start[2]
+            pygame.draw.line(screen, (255, 255, 255), start[:2], end[:2], 20)                        
+            pixels = self.getPixels()[pixelIndex:pixelEndIndex]
+            for i, pixel in enumerate(pixels):
+                dist = i / (len(pixels)-1)
+                color = VIZ_COLORS[pixel.getColor()]
+                alpha = pixel.getAlpha() # ** 0.3
+                color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
+                pygame.draw.circle(screen, color, [int(start[0] + dist*vector[0]), int(start[1] + dist*vector[1])], 5)
+            pixelIndex = pixelEndIndex
 
         
 
@@ -499,22 +503,20 @@ class StrandLayoutManager(object):
     def __init__(self):
         self.data = json.load(open('layout.json'))
         self.activeStrand = None
-        self.activeStrandEnd = None # 0 or 1 for start or end
+        self.activeStrandPoint = None
 
     def save(self):
         data = []
         for strand in strands:
             data += [[strand.vizStart, strand.vizEnd]]
-        json.dump(data, open('layout.json', 'w'))
+        json.dump(data, open('layout.json', 'w'), False, True, True, True, None, 2)
 
     def handleMouseDown(self, pos):
         for strand in strands:
-            if math.sqrt((pos[0]-strand.vizStart[0])**2 + (pos[1]-strand.vizStart[1])**2) < 15:
-                self.activeStrand = strand
-                self.activeStrandEnd = 0
-            if math.sqrt((pos[0]-strand.vizEnd[0])**2 + (pos[1]-strand.vizEnd[1])**2) < 15:
-                self.activeStrand = strand
-                self.activeStrandEnd = 1
+            for i, point in enumerate(strand.vizPoints):
+                if math.sqrt((pos[0]-point[0])**2 + (pos[1]-point[1])**2) < 15:
+                    self.activeStrand = strand
+                    self.activeStrandPoint = i                
 
     def handleMouseUp(self):
         self.activeStrand = None
@@ -522,12 +524,7 @@ class StrandLayoutManager(object):
 
     def handleMouseMove(self, pos):
         if self.activeStrand is not None:
-            if self.activeStrandEnd == 0:
-                self.activeStrand.vizStart = pos
-            else:
-                self.activeStrand.vizEnd = pos
-
-
+            self.activeStrand.vizPoints[self.activeStrandPoint] = pos            
 
 ## 
 
@@ -648,16 +645,16 @@ def beat():
 layout = StrandLayoutManager()
 
 strands = [
-    Strand([30, 30, 30, 30], layout.data[0]), 
-    Strand(30, layout.data[1]),
-    Strand(30, layout.data[2]),
-    Strand(30, layout.data[3]),    
+    Strand(120, layout.data[0]), 
+    # Strand(30, layout.data[1]),
+    # Strand(30, layout.data[2]),
+    # Strand(30, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 29, strands[0], 30),
-    createNode(strands[0], 29, strands[2], 0),
-    createNode(strands[3], 0, strands[1], 29),
-    createNode(strands[3], 29, strands[2], 29),
+    createNode(strands[0], 30, strands[0], 30),
+    createNode(strands[0], 60, strands[0], 60),
+    # createNode(strands[3], 0, strands[1], 29),
+    # createNode(strands[3], 29, strands[2], 29),
 ]   
 
 
