@@ -460,13 +460,13 @@ class Strand(object):
 
         newThings = [node]
 
-        line1 = Line(pixelIndex - lineStart)
-        line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
-
-        if pixelIndex > 0 and len(line1.pixels) == 0:
-            #inserting right after the same node
+        if (i > 0 and self.things[i-1] == node) or (i < len(self.things)-1 and self.things[i+1] == node):
+            #inserting right beside the same node, just shorten the line
             line.setPixelCount(len(line.pixels)-1)
+            self.things = self.things[:i] + [node] + self.things[i:]
+            return
 
+        line1 = Line(pixelIndex - lineStart)
         if len(line1.pixels) > 0:
             line1.node2 = node
             if line.node1 is not None:
@@ -475,6 +475,7 @@ class Strand(object):
             node.addLine(line1)
             newThings = [line1] + newThings
 
+        line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
         if len(line2.pixels) > 0:
             line2.node1 = node
             if line.node2 is not None:
@@ -660,7 +661,7 @@ strands = [
     # Strand(30, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 30),
+    createNode(strands[0], 30, strands[0], 31),
     createNode(strands[0], 60),
     # createNode(strands[3], 0, strands[1], 29),
     # createNode(strands[3], 29, strands[2], 29),
