@@ -677,12 +677,21 @@ for x in range(4):
         moves += [psmove.PSMove(x)]
     else:
         moves += [None]
+
+def getMove(serial):
+    global moves
+    for move in moves:
+        if move is not None and m.get_serial() == serial:
+            return move
+    print('Could not find move ', serial)
+    return None
+
 ###
 
 ### PLAYER CONFIG
 players = [
-    Player(nodes[0], 1, [255,0,170], moves[0], pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
-    Player(nodes[1], 2, [255,170,0], moves[1], pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
+    Player(nodes[0], 1, [255,0,170], getMove('a'), pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
+    Player(nodes[1], 2, [255,170,0], getMove('b'), pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
     #Player(nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
     #Player(nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
