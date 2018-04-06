@@ -57,9 +57,12 @@ class Line(object):
         self.node2 = None
         self.line1 = None #continuing line from start
         self.line2 = None #continuing line from end
+        self.setPixelCount(pixelCount)
+
+    def setPixelCount(self, pixelCount):
         self.pixels = []
         for i in range(pixelCount):
-            self.pixels.append(Pixel())
+            self.pixels.append(Pixel())        
 
     def isIndexAtConnection(self, index):
         if (index < 0):
@@ -458,6 +461,12 @@ class Strand(object):
         newThings = [node]
 
         line1 = Line(pixelIndex - lineStart)
+        line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
+
+        if pixelIndex > 0 and len(line1.pixels) == 0:
+            #inserting right after the same node
+            line.setPixelCount(len(line.pixels)-1)
+
         if len(line1.pixels) > 0:
             line1.node2 = node
             if line.node1 is not None:
@@ -466,7 +475,6 @@ class Strand(object):
             node.addLine(line1)
             newThings = [line1] + newThings
 
-        line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
         if len(line2.pixels) > 0:
             line2.node1 = node
             if line.node2 is not None:
@@ -487,7 +495,7 @@ class Strand(object):
             pygame.draw.line(screen, (255, 255, 255), start[:2], end[:2], 20)                        
             pixels = self.getPixels()[pixelIndex:pixelEndIndex]
             for i, pixel in enumerate(pixels):
-                dist = i / (len(pixels)-1)
+                dist = (i+1) / (len(pixels)+1)
                 color = VIZ_COLORS[pixel.getColor()]
                 alpha = pixel.getAlpha() # ** 0.3
                 color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
@@ -508,8 +516,8 @@ class StrandLayoutManager(object):
     def save(self):
         data = []
         for strand in strands:
-            data += [[strand.vizStart, strand.vizEnd]]
-        json.dump(data, open('layout.json', 'w'), False, True, True, True, None, 2)
+            data += [strand.vizPoints]
+        json.dump(data, open('layout.json', 'w'), indent=2)
 
     def handleMouseDown(self, pos):
         for strand in strands:
@@ -524,7 +532,8 @@ class StrandLayoutManager(object):
 
     def handleMouseMove(self, pos):
         if self.activeStrand is not None:
-            self.activeStrand.vizPoints[self.activeStrandPoint] = pos            
+            self.activeStrand.vizPoints[self.activeStrandPoint][0] = pos[0]            
+            self.activeStrand.vizPoints[self.activeStrandPoint][1] = pos[1]            
 
 ## 
 
@@ -618,7 +627,7 @@ def startGamePart2():
     global powerupCount
     beatSpeed = 700
     pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
-    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 10000)
+    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 60000)
     powerupCount = 8   
 
 
@@ -651,8 +660,8 @@ strands = [
     # Strand(30, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 30, strands[0], 30),
-    createNode(strands[0], 60, strands[0], 60),
+    createNode(strands[0], 30),
+    createNode(strands[0], 60),
     # createNode(strands[3], 0, strands[1], 29),
     # createNode(strands[3], 29, strands[2], 29),
 ]   
