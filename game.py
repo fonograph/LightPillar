@@ -685,7 +685,6 @@ def getMove(serial):
             return move
     print('Could not find move ', serial)
     return None
-
 ###
 
 ### PLAYER CONFIG
@@ -806,6 +805,12 @@ while appRunning:
             layout.handleMouseUp()
         elif event.type == pygame.MOUSEMOTION:
             layout.handleMouseMove(event.pos)
+
+
+    # Rogue controller
+    
+    rogue = getMove('c')
+    if rogue is not None:
 
        
 
