@@ -3,12 +3,19 @@ import pygame.time
 import random
 import serial
 import json
-from serial.tools import list_ports
 import time
 import sys
 import math
+import argparse
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--rogue', '-r')
+parser.add_argument('--port1', '-p1')
+parser.add_argument('--port2', '-p2')
+args = parser.parse_args()
+
 
 pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
@@ -222,6 +229,10 @@ class Player(object):
         self.alive = alive
         self.pulseAccum = 0
 
+        if self.alive and self.move is not None:
+            self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
+            self.move.update_leds()
+
         self.advanceToPixel(self.currentNode.pixel)
 
 
@@ -428,8 +439,9 @@ VIZ_COLORS = [
 
 class Strand(object):
 
-    def __init__(self, pixelCount, vizLayout):
+    def __init__(self, pixelCount, serial, vizLayout):
         self.pixelCount = pixelCount # all pixels including nodes
+        self.serial = serial
         self.things = [Line(pixelCount)]
 
         self.vizPoints = vizLayout
@@ -486,7 +498,24 @@ class Strand(object):
 
         self.things = self.things[:i] + newThings + self.things[i+1:]
 
+    def sendDataToSerial(self):
+        if self.serial is not None:
+            pixelData = [(((i%8) << 5) + 31) for i,pixel in enumerate(self.getPixels())]
+            #pixelData = [pixel.getData() for pixel in self.getPixels()]
+            self.serial.write(bytes(pixelData))
+            self.serial.flush()
+            #print(pixelData)
+            #print(ser.readline())
+            self.serial.readline()
+
+    def sendSetupToSerial(self):
+        if self.serial is not None:
+            self.serial.write(bytes([len(self.getPixels())])) #send length
+            self.serial.flush()
+            self.serial.readline()
+
     def renderViz(self, screen):
+        return
         pixelIndex = 0
         for j in range(len(self.vizPoints)-1):
             start = self.vizPoints[j]
@@ -650,24 +679,32 @@ def beat():
 
 ##
 
+### SERIAL CONFIG
+try:
+    ser1 = serial.Serial(args.port1, 0) if (args.port1 is not None) else None
+    ser2 = serial.Serial(args.port2, 0) if (args.port2 is not None) else None
+except Exception as e:
+    print('serial error', e)
+    ser1 = None
+    ser2 = None
+###
+print(ser1, args.port1)
 
 ### BOARD CONFIG
 layout = StrandLayoutManager()
 
 strands = [
-    Strand(120, layout.data[0]), 
-    # Strand(30, layout.data[1]),
-    # Strand(30, layout.data[2]),
-    # Strand(30, layout.data[3]),    
+    Strand(210, ser1, layout.data[0]), 
+    Strand(210, ser1, layout.data[1]),
+    # Strand(30, ser2, layout.data[2]),
+    # Strand(30, ser2, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 30, strands[0], 31),
+    createNode(strands[0], 5),
     createNode(strands[0], 60),
     # createNode(strands[3], 0, strands[1], 29),
     # createNode(strands[3], 29, strands[2], 29),
 ]   
-
-
 ### 
 
 ### PSMOVE CONFIG
@@ -681,7 +718,7 @@ for x in range(4):
 def getMove(serial):
     global moves
     for move in moves:
-        if move is not None and m.get_serial() == serial:
+        if move is not None and move.get_serial() == serial:
             return move
     print('Could not find move ', serial)
     return None
@@ -689,20 +726,11 @@ def getMove(serial):
 
 ### PLAYER CONFIG
 players = [
-    Player(nodes[0], 1, [255,0,170], getMove('a'), pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
-    Player(nodes[1], 2, [255,170,0], getMove('b'), pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
+    Player(nodes[0], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
+    Player(nodes[1], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
     #Player(nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
     #Player(nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
-###
-
-### SERIAL CONFIG
-print("\n\n", [port.device for port in list_ports.comports()], "\n\n")
-ser = None
-try:
-    ser = serial.Serial('/dev/cu.usbmodem1451', 115200)
-except:
-    ser = None
 ###
 
 ### SOUNDS
@@ -727,11 +755,22 @@ gameEnded = False
 powerupCount = 0
 ###
 
-
+### ROGUE CONTROLLER SETUP
+rogueMove = getMove('00:06:f7:c9:6d:d4')
+roguePlayer = None
+if rogueMove is not None and args.rogue is not None:
+    roguePlayer = players[int(args.rogue)-1]
+    rogueMove.set_leds(roguePlayer.colorValue[0], roguePlayer.colorValue[1], roguePlayer.colorValue[2])
+    rogueMove.update_leds()
+###
 
 ### MAKE ROCKET GO
 
 time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
+
+# Arduino setup
+for strand in strands:
+    strand.sendSetupToSerial()
 
 while appRunning:
     screen.fill(pygame.Color('black'))
@@ -807,20 +846,18 @@ while appRunning:
             layout.handleMouseMove(event.pos)
 
 
-    # Rogue controller
-    
-    rogue = getMove('c')
-    if rogue is not None:
+    # ROGUE CONTROLLER
+    if gameRunning and not gameEnded and roguePlayer is not None and rogueMove is not None:
+        rogueMove.update_leds()
+        while rogueMove.poll():
+            pressed, released = rogueMove.get_button_events()
+            if pressed & psmove.Btn_T:
+                roguePlayer.goNodeExit()
+            elif pressed & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
+                roguePlayer.advanceNodeExit()
 
        
 
     for strand in strands:
-        pixelData = [pixel.getData() for pixel in strand.getPixels()]
-        if ser is not None:
-            ser.write(bytes(pixelData))
-            ser.flush()
-
-            #print(pixelData)
-            #print(ser.readline())
-            ser.readline()
+        strand.sendDataToSerial()
 

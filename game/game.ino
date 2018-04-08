@@ -4,19 +4,17 @@
   #include <avr/power.h>
 #endif
 
-#define PIXELS_PER_STRIP 60
-#define STRIP_COUNT 4
+#define STRIP_COUNT 2
+#define MAX_PIXELS_PER_STRIP 240
 
-Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 5, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 6, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip3 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 9, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strip4 = Adafruit_NeoPixel(PIXELS_PER_STRIP, 10, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel strips[] = {strip1, strip2, strip3, strip4};
+Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(MAX_PIXELS_PER_STRIP, 5, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip2 = Adafruit_NeoPixel(MAX_PIXELS_PER_STRIP, 6, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strips[] = {strip1, strip2};
 
 byte stripIndex = 0;
-byte buffer[PIXELS_PER_STRIP];
+byte buffer[MAX_PIXELS_PER_STRIP];
 byte bufferIndex = 0;
-
+bool stripsReady = false;
 
 void setup() {
   for (byte s = 0; s < STRIP_COUNT; s++) {
@@ -24,10 +22,10 @@ void setup() {
     strips[s].show();
   }
 
-  Serial.begin(115200);
+  Serial.begin(0);
 
   for (byte s = 0; s < STRIP_COUNT; s++) {
-    for (byte i = 0; i <= PIXELS_PER_STRIP; i++) {
+    for (byte i = 0; i <= strips[s].numPixels(); i++) {
       strips[s].setPixelColor(i, strips[s].Color(0, 0, 0));
     }
     strips[s].show();
@@ -38,18 +36,26 @@ void loop() {
   byte rc;
   while (Serial.available() > 0) {
     rc = Serial.read();
-    //Serial.println(rc);
-    buffer[bufferIndex] = rc;
-    bufferIndex++;
-    //Serial.println(bufferIndex);
-    if (bufferIndex == PIXELS_PER_STRIP) {
-      updateStrip(&strips[stripIndex], buffer);    
-      //Serial.write(buffer, 30);   
-      Serial.println(stripIndex); // Newline is the ACK required by the python end
-      bufferIndex = 0;
+    if (!stripsReady) {
+      strips[stripIndex].updateLength(rc);
       stripIndex++;
       if (stripIndex == STRIP_COUNT) {
+        stripsReady = true;
         stripIndex = 0;
+      }
+      Serial.println(stripIndex); //ack
+    }
+    else {
+      buffer[bufferIndex] = rc;
+      bufferIndex++;
+      if (bufferIndex == strips[stripIndex].numPixels()) {
+        updateStrip(&strips[stripIndex], buffer);    
+        bufferIndex = 0;
+        stripIndex++;
+        if (stripIndex == STRIP_COUNT) {
+          stripIndex = 0;
+        }
+        Serial.println(stripIndex); //ack
       }
     }
   }
@@ -59,7 +65,7 @@ void loop() {
 void updateStrip(Adafruit_NeoPixel* strip, byte* data) {
   byte color;
   byte alpha;
-  for (byte i = 0; i <= PIXELS_PER_STRIP; i++) {
+  for (byte i = 0; i < strip->numPixels(); i++) {
     color = data[i] >> 5;
     alpha = (data[i] & B00011111) << 3;
     if (color == 0) {
