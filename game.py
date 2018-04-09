@@ -9,12 +9,14 @@ import math
 import argparse
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
+from neopixel import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--rogue', '-r')
 parser.add_argument('--port1', '-p1')
 parser.add_argument('--port2', '-p2')
 args = parser.parse_args()
+
 
 
 pygame.mixer.pre_init(44100, -16, 2, 2048)
@@ -435,17 +437,22 @@ VIZ_COLORS = [
     (0,170,255),
     (170,255,0),
     (255,255,255),
+    (0,255,0),
     (0,0,255)
 ]
 
 class Strand(object):
 
-    def __init__(self, pixelCount, serial, vizLayout):
+    def __init__(self, pixelCount, pin, vizLayout):
         self.pixelCount = pixelCount # all pixels including nodes
-        self.serial = serial
+        self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, 0)
+        self.strip.begin()
         self.things = [Line(pixelCount)]
-
         self.vizPoints = vizLayout
+
+        for i in range(pixelCount):
+            self.strip.setPixelColor(i, Color(0,0,0))
+            self.strip.show()
 
     def getPixels(self):
         px = []
@@ -507,18 +514,41 @@ class Strand(object):
         self.things = self.things[:i] + newThings + self.things[i+1:]
 
     def sendDataToSerial(self):
-        if self.serial is not None:
+        if self.strip is not None:
+            for pixel in self.getPixels():
+
+                color = pixel.getColor()
+                alpha = pixel.getAlpha() * 255
+                if (color == 0) {
+                  self.strip.setPixelColor(i, Color(0, 0, 0))
+                } else if (color == 1) {
+                  self.strip.setPixelColor(i, Color(round(alpha/2), 0, round(alpha*0.5/2)))
+                } else if (color == 2) {
+                  self.strip.setPixelColor(i, Color(round(alpha/2), round(alpha*0.3/2), 0))
+                } else if (color == 3) {
+                  self.strip.setPixelColor(i, Color(0, round(alpha/2), round(alpha/2)))
+                } else if (color == 4) {
+                  self.strip.setPixelColor(i, Color(round(alpha*0.8/2), round(alpha/2, 0)))
+                } else if (color == 5) {
+                  self.strip.setPixelColor(i, Color(round(alpha/3), round(alpha/3), round(alpha/3)))
+                } else if (color == 6) {
+                  self.strip.setPixelColor(i, Color(0, round(alpha), 0))
+                } else if (color == 7) {
+                  self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
+                }   
+                self.strip.show()
+
             #pixelData = [(((i%8) << 5) + 31) for i,pixel in enumerate(self.getPixels())]
-            pixelData = [pixel.getData() for pixel in self.getPixels()]
-            self.serial.write(bytes(pixelData))
-            self.serial.flush()
-            self.serial.readline()
+            # pixelData = [pixel.getData() for pixel in self.getPixels()]
+            # self.serial.write(bytes(pixelData))
+            # self.serial.flush()
+            # self.serial.readline()
 
     def sendSetupToSerial(self):
-        if self.serial is not None:
-            self.serial.write(bytes([len(self.getPixels())])) #send length
-            self.serial.flush()
-            self.serial.readline()
+        # if self.serial is not None:
+        #     self.serial.write(bytes([len(self.getPixels())])) #send length
+        #     self.serial.flush()
+        #     self.serial.readline()
 
     def renderViz(self, screen):
         pixelIndex = 0
@@ -695,12 +725,13 @@ except Exception as e:
 ###
 print(ser1, args.port1)
 
+
 ### BOARD CONFIG
 layout = StrandLayoutManager()
 
 strands = [
-    Strand(210, ser1, layout.data[0]), 
-    Strand(210, ser1, layout.data[1]),
+    Strand(210, layout.data[0]), 
+    Strand(210, layout.data[1]),
     # Strand(30, ser2, layout.data[2]),
     # Strand(30, ser2, layout.data[3]),    
 ]
@@ -874,6 +905,5 @@ while appRunning:
        
 
     for strand in strands:
-        strand.sendDataToSerial()
         strand.sendDataToSerial()
 
