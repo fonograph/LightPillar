@@ -730,20 +730,20 @@ print(ser1, args.port1)
 layout = StrandLayoutManager()
 
 strands = [
-    Strand(210, layout.data[0]), 
-    Strand(210, layout.data[1]),
+    Strand(210, 18, layout.data[0]), 
+    #Strand(210, layout.data[1]),
     # Strand(30, ser2, layout.data[2]),
     # Strand(30, ser2, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 0, strands[1], 0),
-    createNode(strands[1], 29),
-    createNode(strands[0], 29, strands[1], 59),
-    createNode(strands[0], 179, strands[1], 89),
-    createNode(strands[0], 59, strands[1], 119),
-    createNode(strands[0], 149, strands[1], 149),
-    createNode(strands[0], 89, strands[1], 179),
-    createNode(strands[0], 4, strands[0], 209),
+    createNode(strands[0], 0),
+    createNode(strands[0], 29),
+    # createNode(strands[0], 29, strands[1], 59),
+    # createNode(strands[0], 179, strands[1], 89),
+    # createNode(strands[0], 59, strands[1], 119),
+    # createNode(strands[0], 149, strands[1], 149),
+    # createNode(strands[0], 89, strands[1], 179),
+    # createNode(strands[0], 4, strands[0], 209),
 
 
 
