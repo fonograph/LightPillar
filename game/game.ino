@@ -22,7 +22,7 @@ void setup() {
     strips[s].show();
   }
 
-  Serial.begin(0);
+  Serial.begin(250000);
 
   for (byte s = 0; s < STRIP_COUNT; s++) {
     for (byte i = 0; i <= strips[s].numPixels(); i++) {
@@ -71,17 +71,19 @@ void updateStrip(Adafruit_NeoPixel* strip, byte* data) {
     if (color == 0) {
       strip->setPixelColor(i, strip->Color(0, 0, 0));
     } else if (color == 1) {
-      strip->setPixelColor(i, strip->Color(alpha/4, 0, alpha*0.5/4));
+      strip->setPixelColor(i, strip->Color(alpha/2, 0, alpha*0.5/2));
     } else if (color == 2) {
-      strip->setPixelColor(i, strip->Color(alpha/4, alpha*0.3/4, 0));
+      strip->setPixelColor(i, strip->Color(alpha/2, alpha*0.3/2, 0));
     } else if (color == 3) {
-      strip->setPixelColor(i, strip->Color(0, alpha/4, alpha/4));
+      strip->setPixelColor(i, strip->Color(0, alpha/2, alpha/2));
     } else if (color == 4) {
-      strip->setPixelColor(i, strip->Color(alpha*0.5/4, alpha/4, 0));
+      strip->setPixelColor(i, strip->Color(alpha*0.8/2, alpha/2, 0));
     } else if (color == 5) {
-      strip->setPixelColor(i, strip->Color(alpha/8, alpha/8, alpha/8));
+      strip->setPixelColor(i, strip->Color(alpha/3, alpha/3, alpha/3));
     } else if (color == 6) {
-      strip->setPixelColor(i, strip->Color(0, 0, alpha/4));
+      strip->setPixelColor(i, strip->Color(0, alpha, 0));
+    } else if (color == 7) {
+      strip->setPixelColor(i, strip->Color(alpha, 0, 0));
     }
   }
   strip->show();

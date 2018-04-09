@@ -21,7 +21,7 @@ pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
-screen = pygame.display.set_mode((1280, 960), pygame.FULLSCREEN|pygame.HWSURFACE)
+screen = pygame.display.set_mode((1600, 1000), pygame.FULLSCREEN|pygame.HWSURFACE)
 font = pygame.font.Font(None, 30)
 
 ##
@@ -148,6 +148,7 @@ class Pixel(object):
 
     def unsetPlayer(self):
         self.player = None
+        self.playerCapturePercent = 0.8
 
     def unsetCapture(self):
         self.playerCapture = None
@@ -183,14 +184,14 @@ class Pixel(object):
         if self.playerCapture is not None and self.player is None:
             self.playerCapturePercent -= fadeSpeed;
             self.playerCapturePercent = max(self.playerCapturePercent, minCapture)
-            self.alpha = max(pow(self.playerCapturePercent, 2), 0.05)
+            self.alpha = max(self.playerCapturePercent ** 2, 0.05)
 
 
     def pulse(self, accum):
         accum = accum % 200
         if accum > 100:
             accum = 200 - accum
-        self.alpha = max(pow(0.1 + accum/100*0.9, 2), 0.05)
+        self.alpha = max((0.1 + accum/100*0.9) ** 2, 0.05)
 
 ##
 
@@ -462,20 +463,23 @@ class Strand(object):
     def insertNode(self, pixelIndex, node):
         line = None
         lineStart = 0
+        lineEnd = 0
         i = 0
         while line is None:
-            if lineStart + len(self.things[i].pixels) > pixelIndex:
+            lineEnd = lineStart + len(self.things[i].pixels)
+            if lineEnd > pixelIndex:
                 line = self.things[i]
             else:
-                lineStart += len(self.things[i].pixels)
+                lineStart = lineEnd
                 i += 1
 
         newThings = [node]
 
-        if (i > 0 and self.things[i-1] == node) or (i < len(self.things)-1 and self.things[i+1] == node):
+        if (lineStart == pixelIndex and i > 0 and self.things[i-1] == node) or (lineEnd-1 == pixelIndex and i < len(self.things)-1 and self.things[i+1] == node):
             #inserting right beside the same node, just shorten the line
             line.setPixelCount(len(line.pixels)-1)
             self.things = self.things[:i] + [node] + self.things[i:]
+            print('adjacent node')
             return
 
         line1 = Line(pixelIndex - lineStart)
@@ -486,6 +490,8 @@ class Strand(object):
                 line.node1.replaceLine(line, line1)
             node.addLine(line1)
             newThings = [line1] + newThings
+            if (line1.node1 == line1.node2):
+                print("line1 error", line1.node1)
 
         line2 = Line(len(line.pixels) - len(line1.pixels) - 1)
         if len(line2.pixels) > 0:
@@ -495,17 +501,17 @@ class Strand(object):
                 line.node2.replaceLine(line, line2)
             node.addLine(line2) 
             newThings = newThings + [line2]
+            if (line2.node1 == line2.node2):
+                print("line1 error", line2.node1)
 
         self.things = self.things[:i] + newThings + self.things[i+1:]
 
     def sendDataToSerial(self):
         if self.serial is not None:
-            pixelData = [(((i%8) << 5) + 31) for i,pixel in enumerate(self.getPixels())]
-            #pixelData = [pixel.getData() for pixel in self.getPixels()]
+            #pixelData = [(((i%8) << 5) + 31) for i,pixel in enumerate(self.getPixels())]
+            pixelData = [pixel.getData() for pixel in self.getPixels()]
             self.serial.write(bytes(pixelData))
             self.serial.flush()
-            #print(pixelData)
-            #print(ser.readline())
             self.serial.readline()
 
     def sendSetupToSerial(self):
@@ -515,7 +521,6 @@ class Strand(object):
             self.serial.readline()
 
     def renderViz(self, screen):
-        return
         pixelIndex = 0
         for j in range(len(self.vizPoints)-1):
             start = self.vizPoints[j]
@@ -527,7 +532,7 @@ class Strand(object):
             for i, pixel in enumerate(pixels):
                 dist = (i+1) / (len(pixels)+1)
                 color = VIZ_COLORS[pixel.getColor()]
-                alpha = pixel.getAlpha() # ** 0.3
+                alpha = pixel.getAlpha() ** 0.5
                 color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
                 pygame.draw.circle(screen, color, [int(start[0] + dist*vector[0]), int(start[1] + dist*vector[1])], 5)
             pixelIndex = pixelEndIndex
@@ -681,7 +686,7 @@ def beat():
 
 ### SERIAL CONFIG
 try:
-    ser1 = serial.Serial(args.port1, 0) if (args.port1 is not None) else None
+    ser1 = serial.Serial(args.port1, 250000) if (args.port1 is not None) else None
     ser2 = serial.Serial(args.port2, 0) if (args.port2 is not None) else None
 except Exception as e:
     print('serial error', e)
@@ -700,8 +705,17 @@ strands = [
     # Strand(30, ser2, layout.data[3]),    
 ]
 nodes = [
-    createNode(strands[0], 5),
-    createNode(strands[0], 60),
+    createNode(strands[0], 0, strands[1], 0),
+    createNode(strands[1], 29),
+    createNode(strands[0], 29, strands[1], 59),
+    createNode(strands[0], 179, strands[1], 89),
+    createNode(strands[0], 59, strands[1], 119),
+    createNode(strands[0], 149, strands[1], 149),
+    createNode(strands[0], 89, strands[1], 179),
+    createNode(strands[0], 4, strands[0], 209),
+
+
+
     # createNode(strands[3], 0, strands[1], 29),
     # createNode(strands[3], 29, strands[2], 29),
 ]   
@@ -766,7 +780,7 @@ if rogueMove is not None and args.rogue is not None:
 
 ### MAKE ROCKET GO
 
-time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
+#time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
 
 # Arduino setup
 for strand in strands:
@@ -778,6 +792,7 @@ while appRunning:
        strand.renderViz(screen)
     screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
     pygame.display.flip()
+    #pygame.display.set_caption(str(int(clock.get_fps())))
 
     clock.tick(30)
 
@@ -859,5 +874,6 @@ while appRunning:
        
 
     for strand in strands:
+        strand.sendDataToSerial()
         strand.sendDataToSerial()
 
