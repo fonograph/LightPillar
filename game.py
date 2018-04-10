@@ -19,11 +19,11 @@ args = parser.parse_args()
 
 
 
-pygame.mixer.pre_init(44100, -16, 2, 2048)
-pygame.mixer.init()
+#pygame.mixer.pre_init(44100, -16, 2, 2048)
+#pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
-screen = pygame.display.set_mode((1600, 1000), pygame.FULLSCREEN|pygame.HWSURFACE)
+screen = pygame.display.set_mode((1400, 900)) #, pygame.FULLSCREEN|pygame.HWSURFACE)
 font = pygame.font.Font(None, 30)
 
 ##
@@ -362,13 +362,13 @@ class Player(object):
             self.currentNode = None
             self.moveAccum = 0
             self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
-            self.nodeExitSound.play()
+            #self.nodeExitSound.play()
 
     def powerup(self):
         #self.length += 2
         self.moveMultiplier = 2
         self.movesBeforeMultiplierReset = 10
-        collectSound.play()
+        #collectSound.play()
 
         global beatSpeed
         beatSpeed -= 20
@@ -384,7 +384,7 @@ class Player(object):
         if self.move is not None:
             self.move.set_leds(0, 0, 0)
             self.move.update_leds()
-        deathSound.play()
+        #deathSound.play()
 
     def collideWith(self, player):
         self.kill()
@@ -443,9 +443,9 @@ VIZ_COLORS = [
 
 class Strand(object):
 
-    def __init__(self, pixelCount, pin, vizLayout):
+    def __init__(self, pixelCount, pin, channel, vizLayout):
         self.pixelCount = pixelCount # all pixels including nodes
-        self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, 0)
+        self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, channel)
         self.strip.begin()
         self.things = [Line(pixelCount)]
         self.vizPoints = vizLayout
@@ -513,31 +513,31 @@ class Strand(object):
 
         self.things = self.things[:i] + newThings + self.things[i+1:]
 
-    def sendDataToSerial(self):
+    def sendDataToSerial(self):        
         if self.strip is not None:
-            for pixel in self.getPixels():
+            for i, pixel in enumerate(self.getPixels()):
 
                 color = pixel.getColor()
                 alpha = pixel.getAlpha() * 255
-                if (color == 0) {
+                if (color == 0):
                   self.strip.setPixelColor(i, Color(0, 0, 0))
-                } else if (color == 1) {
+                elif (color == 1):
                   self.strip.setPixelColor(i, Color(round(alpha/2), 0, round(alpha*0.5/2)))
-                } else if (color == 2) {
+                elif (color == 2):
                   self.strip.setPixelColor(i, Color(round(alpha/2), round(alpha*0.3/2), 0))
-                } else if (color == 3) {
+                elif (color == 3):
                   self.strip.setPixelColor(i, Color(0, round(alpha/2), round(alpha/2)))
-                } else if (color == 4) {
+                elif (color == 4):
                   self.strip.setPixelColor(i, Color(round(alpha*0.8/2), round(alpha/2, 0)))
-                } else if (color == 5) {
+                elif (color == 5):
                   self.strip.setPixelColor(i, Color(round(alpha/3), round(alpha/3), round(alpha/3)))
-                } else if (color == 6) {
+                elif (color == 6):
                   self.strip.setPixelColor(i, Color(0, round(alpha), 0))
-                } else if (color == 7) {
+                elif (color == 7):
                   self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
-                }   
-                self.strip.show()
 
+            self.strip.show()
+                    
             #pixelData = [(((i%8) << 5) + 31) for i,pixel in enumerate(self.getPixels())]
             # pixelData = [pixel.getData() for pixel in self.getPixels()]
             # self.serial.write(bytes(pixelData))
@@ -545,6 +545,7 @@ class Strand(object):
             # self.serial.readline()
 
     def sendSetupToSerial(self):
+        ...
         # if self.serial is not None:
         #     self.serial.write(bytes([len(self.getPixels())])) #send length
         #     self.serial.flush()
@@ -709,7 +710,7 @@ beatSpeed = 0
 def beat():
     global beatCounter
     beatCounter += 1
-    beatSounds[beatCounter % len(beatSounds)].play()
+    #beatSounds[beatCounter % len(beatSounds)].play()
 
 
 ##
@@ -730,20 +731,20 @@ print(ser1, args.port1)
 layout = StrandLayoutManager()
 
 strands = [
-    Strand(210, 18, layout.data[0]), 
-    #Strand(210, layout.data[1]),
+    Strand(420, 18, 0, layout.data[0]), 
+    Strand(420, 13, 1, layout.data[1]),
     # Strand(30, ser2, layout.data[2]),
     # Strand(30, ser2, layout.data[3]),    
 ]
 nodes = [
     createNode(strands[0], 0),
     createNode(strands[0], 29),
-    # createNode(strands[0], 29, strands[1], 59),
-    # createNode(strands[0], 179, strands[1], 89),
-    # createNode(strands[0], 59, strands[1], 119),
-    # createNode(strands[0], 149, strands[1], 149),
-    # createNode(strands[0], 89, strands[1], 179),
-    # createNode(strands[0], 4, strands[0], 209),
+    createNode(strands[0], 29, strands[1], 59),
+    createNode(strands[0], 179, strands[1], 89),
+    createNode(strands[0], 59, strands[1], 119),
+    createNode(strands[0], 149, strands[1], 149),
+    createNode(strands[0], 89, strands[1], 179),
+    createNode(strands[0], 4, strands[0], 209),
 
 
 
@@ -771,20 +772,20 @@ def getMove(serial):
 
 ### PLAYER CONFIG
 players = [
-    Player(nodes[0], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
-    Player(nodes[1], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
+    Player(nodes[0], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q, None),
+    Player(nodes[1], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w, None),
     #Player(nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
     #Player(nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
 ###
 
 ### SOUNDS
-beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
-deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
-collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
-startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
-winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
-loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
+#beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
+#deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
+#collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
+#startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
+#winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
+#loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
 
 ### MISC DECLARATIONS
 USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
@@ -818,12 +819,12 @@ for strand in strands:
     strand.sendSetupToSerial()
 
 while appRunning:
-    screen.fill(pygame.Color('black'))
-    for strand in strands:
-       strand.renderViz(screen)
-    screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
-    pygame.display.flip()
-    #pygame.display.set_caption(str(int(clock.get_fps())))
+    #screen.fill(pygame.Color('black'))
+    #for strand in strands:
+    #   strand.renderViz(screen)
+    #screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
+    #pygame.display.flip()
+    pygame.display.set_caption(str(int(clock.get_fps())))
 
     clock.tick(30)
 
