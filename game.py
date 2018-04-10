@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--rogue', '-r')
 parser.add_argument('--port1', '-p1')
 parser.add_argument('--port2', '-p2')
+parser.add_argument('--noviz', action='store_const', const=True)
 args = parser.parse_args()
 
 
@@ -825,12 +826,14 @@ for strand in strands:
     strand.sendSetupToSerial()
 
 while appRunning:
-    #screen.fill(pygame.Color('black'))
-    #for strand in strands:
-    #   strand.renderViz(screen)
-    #screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
-    #pygame.display.flip()
-    pygame.display.set_caption(str(int(clock.get_fps())))
+    if args.noviz != True: 
+        screen.fill(pygame.Color('black'))
+        for strand in strands:
+           strand.renderViz(screen)
+        screen.blit(font.render(str(int(clock.get_fps())), True, pygame.Color('white')), (5, 5))
+        pygame.display.flip()
+    
+    pygame.display.set_caption(str(int(clock.get_fps())))   
 
     clock.tick(30)
 
