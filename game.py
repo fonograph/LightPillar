@@ -17,8 +17,6 @@ except ImportError:
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--rogue', '-r')
-parser.add_argument('--port1', '-p1')
-parser.add_argument('--port2', '-p2')
 parser.add_argument('--noviz', action='store_const', const=True)
 args = parser.parse_args()
 
@@ -545,19 +543,6 @@ class Strand(object):
 
             self.strip.show()
                     
-            #pixelData = [(((i%8) << 5) + 31) for i,pixel in enumerate(self.getPixels())]
-            # pixelData = [pixel.getData() for pixel in self.getPixels()]
-            # self.serial.write(bytes(pixelData))
-            # self.serial.flush()
-            # self.serial.readline()
-
-    def sendSetupToSerial(self):
-        ...
-        # if self.serial is not None:
-        #     self.serial.write(bytes([len(self.getPixels())])) #send length
-        #     self.serial.flush()
-        #     self.serial.readline()
-
     def renderViz(self, screen):
         pixelIndex = 0
         for j in range(len(self.vizPoints)-1):
@@ -722,17 +707,6 @@ def beat():
 
 ##
 
-### SERIAL CONFIG
-try:
-    ser1 = serial.Serial(args.port1, 250000) if (args.port1 is not None) else None
-    ser2 = serial.Serial(args.port2, 0) if (args.port2 is not None) else None
-except Exception as e:
-    print('serial error', e)
-    ser1 = None
-    ser2 = None
-###
-print(ser1, args.port1)
-
 
 ### BOARD CONFIG
 layout = StrandLayoutManager()
@@ -818,12 +792,6 @@ if rogueMove is not None and args.rogue is not None:
 ###
 
 ### MAKE ROCKET GO
-
-#time.sleep(2) # the serial connection resets the arduino, so give the program time to boot
-
-# Arduino setup
-for strand in strands:
-    strand.sendSetupToSerial()
 
 while appRunning:
     if args.noviz != True: 
