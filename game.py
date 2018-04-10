@@ -9,7 +9,11 @@ import math
 import argparse
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
-from neopixel import *
+try:
+    from neopixel import *
+    pixelsAvailable = True
+except ImportError:
+    pixelsAvailable = False
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--rogue', '-r')
@@ -445,13 +449,15 @@ class Strand(object):
 
     def __init__(self, pixelCount, pin, channel, vizLayout):
         self.pixelCount = pixelCount # all pixels including nodes
-        self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, channel)
-        self.strip.begin()
         self.things = [Line(pixelCount)]
         self.vizPoints = vizLayout
+        self.strip = None
 
-        for i in range(pixelCount):
-            self.strip.setPixelColor(i, Color(0,0,0))
+        if pixelsAvailable:
+            self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, channel)
+            self.strip.begin()
+            for i in range(pixelCount):
+                self.strip.setPixelColor(i, Color(0,0,0))
             self.strip.show()
 
     def getPixels(self):
@@ -513,7 +519,7 @@ class Strand(object):
 
         self.things = self.things[:i] + newThings + self.things[i+1:]
 
-    def sendDataToSerial(self):        
+    def writePixels(self):        
         if self.strip is not None:
             for i, pixel in enumerate(self.getPixels()):
 
@@ -906,5 +912,5 @@ while appRunning:
        
 
     for strand in strands:
-        strand.sendDataToSerial()
+        strand.writePixels()
 
