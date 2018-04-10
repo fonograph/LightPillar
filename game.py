@@ -150,7 +150,7 @@ class Pixel(object):
 
     def unsetPlayer(self):
         self.player = None
-        self.playerCapturePercent = 0.8
+        self.playerCapturePercent = 0.5
 
     def unsetCapture(self):
         self.playerCapture = None
@@ -181,7 +181,7 @@ class Pixel(object):
 
     def update(self):
         # fade from capture
-        minCapture = 0.5
+        minCapture = 0.1
         fadeSpeed = 0.001
         if self.playerCapture is not None and self.player is None:
             self.playerCapturePercent -= fadeSpeed;
@@ -563,7 +563,7 @@ class Strand(object):
             for i, pixel in enumerate(pixels):
                 dist = (i+1) / (len(pixels)+1)
                 color = VIZ_COLORS[pixel.getColor()]
-                alpha = pixel.getAlpha() ** 0.5
+                alpha = pixel.getAlpha() ** 0.3
                 color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
                 pygame.draw.circle(screen, color, [int(start[0] + dist*vector[0]), int(start[1] + dist*vector[1])], 5)
             pixelIndex = pixelEndIndex
