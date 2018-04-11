@@ -18,6 +18,7 @@ except ImportError:
 parser = argparse.ArgumentParser()
 parser.add_argument('--rogue', '-r')
 parser.add_argument('--noviz', action='store_const', const=True)
+parser.add_argument('--enemies', action='store_const', const=True)
 args = parser.parse_args()
 
 
@@ -146,14 +147,16 @@ class Pixel(object):
 
     def setPlayer(self, player, alpha):
         self.player = player
-        self.playerCapture = player
-        self.playerCapturePercent = 1
-        self.color = player.color
-        self.alpha = alpha #max(pow(alpha, 2), 0.05)
+        self.setOverride(player.color, alpha)
+        if player.captures:
+            self.playerCapture = player
+            self.playerCapturePercent = 1
 
-    def unsetPlayer(self):
+    def unsetPlayer(self, player):
         self.player = None
-        self.playerCapturePercent = 0.5
+        self.unsetOverride()
+        if player.captures:
+            self.playerCapturePercent = 0.5
 
     def unsetCapture(self):
         self.playerCapture = None
@@ -189,6 +192,7 @@ class Pixel(object):
         if self.playerCapture is not None and self.player is None:
             self.playerCapturePercent -= fadeSpeed;
             self.playerCapturePercent = max(self.playerCapturePercent, minCapture)
+            self.color = self.playerCapture.color
             self.alpha = max(self.playerCapturePercent ** 2, 0.05)
 
 
@@ -202,7 +206,8 @@ class Pixel(object):
 
 class Player(object):
 
-    def __init__(self, startingNode, colorId, colorValue, move, key1, key2, nodeExitSound):
+    def __init__(self, captures, startingNode, colorId, colorValue = None, move = None, key1 = None, key2 = None, nodeExitSound = None):
+        self.captures = captures
         self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
@@ -242,7 +247,7 @@ class Player(object):
         self.advanceToPixel(self.currentNode.pixel)
 
 
-    def update(self, events):
+    def update(self, events = []):
         if not self.alive:
             self.respawnAccum += 1
             if self.respawnAccum >= 100:
@@ -424,7 +429,7 @@ class Player(object):
             newPixel.unsetPowerup()
 
         if (len(self.pixels) > self.length):
-            self.pixels[0].unsetPlayer()
+            self.pixels[0].unsetPlayer(self)
             self.pixels = self.pixels[1:]
 
         for i, pixel in enumerate(self.pixels):
@@ -432,7 +437,25 @@ class Player(object):
 
     def removeFromAllPixels(self):
         for pixel in self.pixels:
-            pixel.unsetPlayer()
+            pixel.unsetPlayer(self)
+
+##
+
+class Enemy(Player):
+
+    def __init__(self, captures, startingNode, colorId):
+        Player.__init__(self, captures, startingNode, colorId)
+        self.nodeAccum = 0
+
+    def update(self):
+        Player.update(self)
+        if self.currentNode:
+            self.nodeAccum += 1
+            if self.nodeAccum >= 30:
+                self.nodeAccum = 0
+                self.currentNodeExitIndex = random.randrange(0, len(self.currentNode.lines))
+                self.goNodeExit()
+        
 
 ##
 
@@ -444,7 +467,7 @@ VIZ_COLORS = [
     (170,255,0),
     (255,255,255),
     (0,255,0),
-    (0,0,255)
+    (255,0,0)
 ]
 
 class Strand(object):
@@ -756,12 +779,21 @@ def getMove(serial):
 
 ### PLAYER CONFIG
 players = [
-    Player(nodes[0], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q, None),
-    Player(nodes[1], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w, None),
-    #Player(nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
-    #Player(nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
+    Player(True, nodes[0], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q),
+    Player(True, nodes[1], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w),
+    #Player(True, nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
+    #Player(True, nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
 ###
+
+### ENEMIES
+enemies = []
+if args.enemies == True:
+    enemies = [
+        Enemy(False, nodes[4], 7),
+        Enemy(False, nodes[5], 7)
+    ] 
+
 
 ### SOUNDS
 #beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
@@ -814,6 +846,9 @@ while appRunning:
         if not gameEnded:
             for player in players:
                 player.update(events)
+
+            for enemy in enemies:
+                enemy.update()
 
             for pixel in getAllPixels():
                 pixel.update()
