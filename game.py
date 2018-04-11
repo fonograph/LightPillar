@@ -287,7 +287,7 @@ class Player(object):
 
             targetAccum = 20
             if nextPixel.playerCapture is not None and nextPixel.playerCapture != self:
-                targetAccum += nextPixel.playerCapturePercent * 20
+                targetAccum += nextPixel.playerCapturePercent * 40
 
             if (self.moveAccum >= targetAccum):
                 self.moveAccum -= targetAccum
@@ -370,7 +370,7 @@ class Player(object):
     def powerup(self):
         #self.length += 2
         self.moveMultiplier = 2
-        self.movesBeforeMultiplierReset = 10
+        self.movesBeforeMultiplierReset = 30
         #collectSound.play()
 
         global beatSpeed
@@ -390,8 +390,11 @@ class Player(object):
         #deathSound.play()
 
     def collideWith(self, player):
-        self.kill()
-        player.kill()
+        if self.moveMultiplier <= player.moveMultiplier:
+            self.kill()
+        if player.moveMultiplier <= self.moveMultiplier:
+            player.kill()
+
         if self.currentLine is not None:
             self.currentLine.clearCaptures()
         else:
