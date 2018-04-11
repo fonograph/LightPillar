@@ -453,7 +453,7 @@ class Strand(object):
         self.strip = None
 
         if pixelsAvailable:
-            self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, channel)
+            self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, channel, ws.WS2812_STRIP)
             self.strip.begin()
             for i in range(pixelCount):
                 self.strip.setPixelColor(i, Color(0,0,0))
