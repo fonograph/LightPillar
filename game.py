@@ -473,22 +473,31 @@ VIZ_COLORS = [
 class Strand(object):
 
     def __init__(self, pixelCount, pin, channel, vizLayout):
-        self.pixelCount = pixelCount # all pixels including nodes
+        self.pin = pin
+        self.channel = channel
         self.things = [Line(pixelCount)]
         self.vizPoints = vizLayout
         self.strip = None
+        self.linkStrand = None
 
-        if pixelsAvailable:
-            self.strip = Adafruit_NeoPixel(pixelCount, pin, 800000, 10, False, 255, channel, ws.WS2812_STRIP)
+    def initPixels(self, linkStrand = None):
+        self.linkStrand = linkStrand
+        if pixelsAvailable and self.pin is not None:
+            pixelCount = len(self.getPixels(True))
+            self.strip = Adafruit_NeoPixel(pixelCount, self.pin, 800000, 10, False, 255, self.channel, ws.WS2812_STRIP)
             self.strip.begin()
             for i in range(pixelCount):
                 self.strip.setPixelColor(i, Color(0,0,0))
             self.strip.show()
 
-    def getPixels(self):
+    def getPixels(self, withLinks):
         px = []
         for thing in self.things:
             px += thing.pixels
+
+        if withLinks == True and self.linkStrand is not None:
+            px += self.linkStrand.getPixels(True)
+
         return px
 
     def getLines(self):
@@ -546,7 +555,7 @@ class Strand(object):
 
     def writePixels(self):        
         if self.strip is not None:
-            for i, pixel in enumerate(self.getPixels()):
+            for i, pixel in enumerate(self.getPixels(True)):
 
                 color = pixel.getColor()
                 alpha = pixel.getAlpha() * 255
@@ -577,7 +586,7 @@ class Strand(object):
             vector = [end[0]-start[0], end[1]-start[1]]
             pixelEndIndex = pixelIndex + start[2]
             pygame.draw.line(screen, (255, 255, 255), start[:2], end[:2], 20)                        
-            pixels = self.getPixels()[pixelIndex:pixelEndIndex]
+            pixels = self.getPixels(False)[pixelIndex:pixelEndIndex]
             for i, pixel in enumerate(pixels):
                 dist = (i+1) / (len(pixels)+1)
                 color = VIZ_COLORS[pixel.getColor()]
@@ -624,7 +633,7 @@ class StrandLayoutManager(object):
 def getAllPixels():
     px = []
     for s in strands:
-        px += s.getPixels()
+        px += s.getPixels(False)
     return px
 
 def getAllLines():
@@ -737,12 +746,16 @@ def beat():
 ### BOARD CONFIG
 layout = StrandLayoutManager()
 
-strands = [
-    Strand(420, 18, 0, layout.data[0]), 
-    Strand(420, 13, 1, layout.data[1]),
-    # Strand(30, ser2, layout.data[2]),
-    # Strand(30, ser2, layout.data[3]),    
+strands = [ 
+    Strand(210, 18, 0, layout.data[0]), 
+    Strand(210, None, None, layout.data[1]),
+    #Strand(210, 13, 1, layout.data[2]),
+    #Strand(210, None, None, layout.data[3]),
 ]
+strands[0].initPixels(strands[1])
+#strands[2].initPixels(strands[2])
+
+
 nodes = [
     createNode(strands[0], 0),
     createNode(strands[0], 29),
