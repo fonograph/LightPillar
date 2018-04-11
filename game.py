@@ -27,7 +27,7 @@ args = parser.parse_args()
 #pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
-screen = pygame.display.set_mode((1400, 900)) #, pygame.FULLSCREEN|pygame.HWSURFACE)
+screen = pygame.display.set_mode((1400, 900))# , pygame.FULLSCREEN|pygame.HWSURFACE)
 font = pygame.font.Font(None, 30)
 
 ##
@@ -57,6 +57,8 @@ class Node(object):
     def hasNoPlayers(self):
         # also includes connected lines
         result = True
+        for pixel in self.pixels:
+            result = result and pixel.player is None
         for line in self.lines:
             result = result and line.hasNoPlayers()
         return result
@@ -252,7 +254,7 @@ class Player(object):
             self.respawnAccum += 1
             if self.respawnAccum >= 100:
                 for node in reversed(self.visitedNodes):
-                    if node.hasNoPlayers:
+                    if node.hasNoPlayers() == True:
                         self.spawnAtNode(node, True)
                         break
         
@@ -448,13 +450,13 @@ class Enemy(Player):
         self.nodeAccum = 0
 
     def update(self):
-        Player.update(self)
-        if self.currentNode:
+        if self.currentNode is not None:
             self.nodeAccum += 1
             if self.nodeAccum >= 30:
                 self.nodeAccum = 0
                 self.currentNodeExitIndex = random.randrange(0, len(self.currentNode.lines))
                 self.goNodeExit()
+        Player.update(self)
         
 
 ##
@@ -720,8 +722,10 @@ def startGamePart2():
     global powerupCount
     beatSpeed = 700
     pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
-    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 60000)
+    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 180000)
     powerupCount = 8   
+    for enemy in enemies:
+        enemy.alive = True
 
 
 blinkCounter = 0
@@ -759,17 +763,10 @@ strands[0].initPixels(strands[1])
 nodes = [
     createNode(strands[0], 0),
     createNode(strands[0], 29),
-    createNode(strands[0], 29, strands[1], 59),
-    createNode(strands[0], 179, strands[1], 89),
-    createNode(strands[0], 59, strands[1], 119),
-    createNode(strands[0], 149, strands[1], 149),
-    createNode(strands[0], 89, strands[1], 179),
-    createNode(strands[0], 4, strands[0], 209),
-
-
-
-    # createNode(strands[3], 0, strands[1], 29),
-    # createNode(strands[3], 29, strands[2], 29),
+    createNode(strands[0], 59),
+    createNode(strands[1], 0),
+    createNode(strands[1], 29),
+    createNode(strands[1], 59),
 ]   
 ### 
 
@@ -792,8 +789,8 @@ def getMove(serial):
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[0], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q),
-    Player(True, nodes[1], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w),
+    Player(True, nodes[4], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q),
+    Player(True, nodes[5], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w),
     #Player(True, nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
     #Player(True, nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
@@ -803,8 +800,10 @@ players = [
 enemies = []
 if args.enemies == True:
     enemies = [
-        Enemy(False, nodes[4], 7),
-        Enemy(False, nodes[5], 7)
+        Enemy(False, nodes[0], 7),
+        Enemy(False, nodes[1], 7),
+        Enemy(False, nodes[2], 7),
+        Enemy(False, nodes[3], 7)
     ] 
 
 
