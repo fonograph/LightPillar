@@ -184,7 +184,7 @@ class Pixel(object):
 
     def update(self):
         # fade from capture
-        minCapture = 0.1
+        minCapture = 0.05
         fadeSpeed = 0.001
         if self.playerCapture is not None and self.player is None:
             self.playerCapturePercent -= fadeSpeed;
