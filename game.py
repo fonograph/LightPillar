@@ -7,6 +7,7 @@ import time
 import sys
 import math
 import argparse
+import fx
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
 try:
@@ -559,24 +560,29 @@ class Strand(object):
         if self.strip is not None:
             for i, pixel in enumerate(self.getPixels(True)):
 
-                color = pixel.getColor()
-                alpha = pixel.getAlpha() * 255
-                if (color == 0):
-                  self.strip.setPixelColor(i, Color(0, 0, 0))
-                elif (color == 1):
-                  self.strip.setPixelColor(i, Color(round(alpha/2), 0, round(alpha*0.5/2)))
-                elif (color == 2):
-                  self.strip.setPixelColor(i, Color(round(alpha/2), round(alpha*0.3/2), 0))
-                elif (color == 3):
-                  self.strip.setPixelColor(i, Color(0, round(alpha/2), round(alpha/2)))
-                elif (color == 4):
-                  self.strip.setPixelColor(i, Color(round(alpha*0.8/2), round(alpha/2, 0)))
-                elif (color == 5):
-                  self.strip.setPixelColor(i, Color(round(alpha/3), round(alpha/3), round(alpha/3)))
-                elif (color == 6):
-                  self.strip.setPixelColor(i, Color(0, round(alpha), 0))
-                elif (color == 7):
-                  self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
+                if currentFX is not None:
+                    color = currentFX.getPixel(i)
+                    self.strip.setPixelColor(i, Color(color[0], color[1], color[2]))
+
+                else:
+                    color = pixel.getColor()
+                    alpha = pixel.getAlpha() * 255
+                    if (color == 0):
+                      self.strip.setPixelColor(i, Color(0, 0, 0))
+                    elif (color == 1):
+                      self.strip.setPixelColor(i, Color(round(alpha/2), 0, round(alpha*0.5/2)))
+                    elif (color == 2):
+                      self.strip.setPixelColor(i, Color(round(alpha/2), round(alpha*0.3/2), 0))
+                    elif (color == 3):
+                      self.strip.setPixelColor(i, Color(0, round(alpha/2), round(alpha/2)))
+                    elif (color == 4):
+                      self.strip.setPixelColor(i, Color(round(alpha*0.8/2), round(alpha/2, 0)))
+                    elif (color == 5):
+                      self.strip.setPixelColor(i, Color(round(alpha/3), round(alpha/3), round(alpha/3)))
+                    elif (color == 6):
+                      self.strip.setPixelColor(i, Color(0, round(alpha), 0))
+                    elif (color == 7):
+                      self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
 
             self.strip.show()
                     
@@ -593,7 +599,10 @@ class Strand(object):
                 dist = (i+1) / (len(pixels)+1)
                 color = VIZ_COLORS[pixel.getColor()]
                 alpha = pixel.getAlpha() ** 0.3
-                color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
+                if currentFX is not None:
+                    color = currentFX.getPixel(i)
+                else:
+                    color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
                 pygame.draw.circle(screen, color, [int(start[0] + dist*vector[0]), int(start[1] + dist*vector[1])], 5)
             pixelIndex = pixelEndIndex
 
@@ -754,11 +763,11 @@ layout = StrandLayoutManager()
 strands = [ 
     Strand(210, 18, 0, layout.data[0]), 
     Strand(210, None, None, layout.data[1]),
-    #Strand(210, 13, 1, layout.data[2]),
-    #Strand(210, None, None, layout.data[3]),
+    Strand(210, 13, 1, layout.data[2]),
+    Strand(210, None, None, layout.data[3]),
 ]
 strands[0].initPixels(strands[1])
-#strands[2].initPixels(strands[2])
+strands[2].initPixels(strands[2])
 
 
 nodes = [
@@ -828,6 +837,7 @@ appRunning = True
 gameRunning = False
 gameEnded = False
 powerupCount = 0
+currentFX = None
 ###
 
 ### ROGUE CONTROLLER SETUP
@@ -931,7 +941,8 @@ while appRunning:
             elif pressed & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
                 roguePlayer.advanceNodeExit()
 
-       
+    if currentFX is not None:
+        currentFX.update()
 
     for strand in strands:
         strand.writePixels()
