@@ -23,8 +23,8 @@ args = parser.parse_args()
 
 
 
-#pygame.mixer.pre_init(44100, -16, 2, 2048)
-#pygame.mixer.init()
+pygame.mixer.pre_init(44100, -16, 2, 2048)
+pygame.mixer.init()
 pygame.init()
 clock = pygame.time.Clock()
 screen = pygame.display.set_mode((1400, 900))# , pygame.FULLSCREEN|pygame.HWSURFACE)
@@ -372,13 +372,13 @@ class Player(object):
             self.currentNode = None
             self.moveAccum = 0
             self.advanceToPixel(self.currentLine.pixels[self.currentLineIndex])
-            #self.nodeExitSound.play()
+            self.nodeExitSound.play()
 
     def powerup(self):
         #self.length += 2
         self.moveMultiplier = 2
         self.movesBeforeMultiplierReset = 30
-        #collectSound.play()
+        collectSound.play()
 
         global beatSpeed
         beatSpeed -= 20
@@ -394,7 +394,7 @@ class Player(object):
         if self.move is not None:
             self.move.set_leds(0, 0, 0)
             self.move.update_leds()
-        #deathSound.play()
+        deathSound.play()
 
     def collideWith(self, player):
         if self.moveMultiplier <= player.moveMultiplier:
@@ -695,6 +695,7 @@ def endGame(winners):
     global blinkColor
     gameEnded = True
     pygame.time.set_timer(USEREVENT_BEAT, 0)
+    winSound.play()
     # if len(winners):
     #     blinkColor = winners[0].color
     #     winSound.play()
@@ -714,7 +715,7 @@ def startGame():
     global gameRunning
     gameRunning = True
     startGamePart2()
-    #startSound.play()
+    startSound.play()
     #pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
 
 def startGamePart2():
@@ -789,8 +790,8 @@ def getMove(serial):
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[4], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q),
-    Player(True, nodes[5], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w),
+    Player(True, nodes[4], 1, [255,0,170], getMove('00:06:f5:eb:4e:52'), pygame.K_1, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
+    Player(True, nodes[5], 2, [255,170,0], getMove('00:06:f7:16:fe:d1'), pygame.K_2, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
     #Player(True, nodes[9], 3, [0,170,255], moves[2], pygame.K_3, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
     #Player(True, nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'))
 ]
@@ -808,12 +809,12 @@ if args.enemies == True:
 
 
 ### SOUNDS
-#beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
-#deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
-#collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
-#startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
-#winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
-#loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
+beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
+deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
+collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
+startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
+winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
+loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
 
 ### MISC DECLARATIONS
 USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
