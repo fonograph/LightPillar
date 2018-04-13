@@ -704,6 +704,7 @@ def endGame(winners):
     global blinkColor
     gameEnded = True
     pygame.time.set_timer(USEREVENT_BEAT, 0)
+    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 0)
     winSound.play()
     # if len(winners):
     #     blinkColor = winners[0].color
@@ -733,10 +734,19 @@ def startGamePart2():
     beatSpeed = 700
     pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
     pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 180000)
+    pygame.time.set_timer(USEREVENT_WARNING_1, 130000)
+    pygame.time.set_timer(USEREVENT_WARNING_2, 169000)
     powerupCount = 8   
     for enemy in enemies:
         enemy.alive = True
 
+def warning1():
+    warning1Sound.play()
+    pygame.time.set_timer(USEREVENT_WARNING_1, 0)
+
+def warning2():
+    warning2Sound.play()
+    pygame.time.set_timer(USEREVENT_WARNING_2, 0)
 
 blinkCounter = 0
 blinkColor = 0
@@ -843,15 +853,19 @@ if args.enemies == True:
 beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
 deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
 collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
-startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
-winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
+startSound = pygame.mixer.Sound('sounds/start.ogg')
+winSound = pygame.mixer.Sound('sounds/end.ogg')
 loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
+warning1Sound = pygame.mixer.Sound('sounds/warning1.ogg')
+warning2Sound = pygame.mixer.Sound('sounds/warning2.ogg')
 
 ### MISC DECLARATIONS
 USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
 USEREVENT_GAME_COMPLETE = pygame.USEREVENT+6
 USEREVENT_ENDGAME_START = pygame.USEREVENT+1
 USEREVENT_ENDGAME_COMPLETE = pygame.USEREVENT+2
+USEREVENT_WARNING_1 = pygame.USEREVENT+7
+USEREVENT_WARNING_2 = pygame.USEREVENT+0
 USEREVENT_BLINK = pygame.USEREVENT+3
 USEREVENT_BEAT = pygame.USEREVENT+4
 
@@ -934,9 +948,12 @@ while appRunning:
 
         elif event.type == USEREVENT_BLINK:
             blink()
-
         elif event.type == USEREVENT_BEAT:
             beat()
+        elif event.type == USEREVENT_WARNING_1:
+            warning1()
+        elif event.type == USEREVENT_WARNING_2:
+            warning2()
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
