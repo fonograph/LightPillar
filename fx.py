@@ -3,7 +3,7 @@ class FX(object):
 	def __init__(self):
 		self.frame = 0
 
-	def update():
+	def update(self):
 		self.frame += 1
 
 
@@ -17,10 +17,9 @@ class FXPulse(FX):
 		FX.update(self)
 
 	def getPixel(self, i):
-		i = i % 60
-		if i > 30:
-			i = 60 - i
-		alpha = i/30
-		return (round(color[0]*alpha), round(color[1]*alpha), round(color[2]*alpha))
-
+		frame = self.frame % 60
+		if frame > 30:
+			frame = 60 - frame
+		alpha = frame/30
+		return (round(self.color[0]*alpha), round(self.color[1]*alpha), round(self.color[2]*alpha))
 

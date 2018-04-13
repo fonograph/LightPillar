@@ -7,7 +7,7 @@ import time
 import sys
 import math
 import argparse
-import fx
+from fx import *
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
 try:
@@ -944,6 +944,11 @@ while appRunning:
             if event.key == pygame.K_RETURN:
                 if gameRunning == False:
                     startGame()
+
+            if event.key == pygame.K_z:
+                currentFX = None
+            if event.key == pygame.K_x:
+                currentFX = FXPulse([255, 0, 0])
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             layout.handleMouseDown(event.pos)
