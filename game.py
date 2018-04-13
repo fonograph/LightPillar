@@ -965,6 +965,8 @@ while appRunning:
             if event.key == pygame.K_z:
                 currentFX = None
             if event.key == pygame.K_x:
+                currentFX = FXStartup()
+            if event.key == pygame.K_c:
                 currentFX = FXPulse([255, 0, 0])
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
