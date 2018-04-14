@@ -94,13 +94,7 @@ class FXAmbient(FX):
 
 
 def randomColor():
-	points = 255
-	r = random.randint(0, points)
-	points -= r
-	g = random.randint(0, points)
-	points -= g
-	b = points
-	return (r,g,b)
+	return wheel(random.randint(0, 255))
 
 def wheel(pos):
     if pos < 85:
