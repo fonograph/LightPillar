@@ -11,15 +11,16 @@ class FX(object):
 
 class FXPulse(FX):
 
-	def __init__(self, color):
+	def __init__(self, speed, color):
 		FX.__init__(self)
 		self.color = color
+		self.speed = speed
 
 	def update(self):
 		FX.update(self)
 
 	def getPixel(self, i):
-		frame = self.frame % 60
+		frame = (self.frame * self.speed) % 60
 		if frame > 30:
 			frame = 60 - frame
 		alpha = frame/30
@@ -43,15 +44,53 @@ class FXStartup(FX):
 				self.stageInc = 1
 			self.nextStage = self.frame + self.stageInc
 
-			p = self.stage / 20
+			p = self.stage / 30
+			white = min(self.stage / 90, 1)
 			for i in range(len(self.pixels)):
 				if random.random() < p:
-					self.pixels[i] = randomColor()
+					color = randomColor()
+					r = round(color[0]*(1-white) + 84*white)
+					g = round(color[1]*(1-white) + 84*white)
+					b = round(color[2]*(1-white) + 84*white)
+					self.pixels[i] = (r,g,b)
 				else:
 					self.pixels[i] = (0,0,0)
 
 	def getPixel(self, i):
 		return self.pixels[i]
+
+class FXTrail(FX):
+
+	def __init__(self, lengthOn, lengthOff, speed, color):
+		FX.__init__(self)
+		self.color = color
+		self.lengthOn = lengthOn
+		self.lengthOff = lengthOff
+		self.speed = speed
+
+	def update(self):
+		FX.update(self)
+
+	def getPixel(self, i):
+		i += self.frame * self.speed
+		i %= self.lengthOn + self.lengthOff
+		if i < self.lengthOn:
+			return self.color
+		else:
+			return (0,0,0)
+
+class FXAmbient(FX):
+
+	def __init__(self, speed):
+		FX.__init__(self)
+		self.speed = speed
+
+	def update(self):
+		FX.update(self)
+
+	def getPixel(self, i):
+		return wheel((i+(self.frame*self.speed)) % 256)
+
 
 
 def randomColor():
@@ -62,3 +101,13 @@ def randomColor():
 	points -= g
 	b = points
 	return (r,g,b)
+
+def wheel(pos):
+    if pos < 85:
+        return (pos * 3, 255 - pos * 3, 0)
+    elif pos < 170:
+        pos -= 85
+        return (255 - pos * 3, 0, pos * 3)
+    elif pos < 256:
+        pos -= 170
+        return (0, pos * 3, 255 - pos * 3)
