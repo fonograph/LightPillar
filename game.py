@@ -283,15 +283,16 @@ class Pixel(object):
 
 class Player(object):
 
-    def __init__(self, captures, startingNode, colorId, colorValue = None, move = None, key1 = None, key2 = None, nodeExitSound = None):
+    def __init__(self, captures, startingNode, colorId, colorValue = None, move = None, keys = None, nodeExitSound = None, pickupSound = None, winSound = None):
         self.captures = captures
         self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
         self.move = move
-        self.key1 = key1
-        self.key2 = key2
+        self.keys = keys
         self.nodeExitSound = nodeExitSound
+        self.pickupSound = pickupSound
+        self.winSound = winSound
         self.reset()
 
     def reset(self):
@@ -367,7 +368,7 @@ class Player(object):
                 aThresh = 1.5
                 accel = self.move.get_accelerometer_frame(psmove.Frame_FirstHalf)
                 accel[2] -= 1
-                if self.lastAccel is not None and pygame.time.get_ticks() - self.lastMoveTime > 500:
+                if self.move.get_trigger() > 0 and self.lastAccel is not None and pygame.time.get_ticks() - self.lastMoveTime > 500:
                     if accel[0] > aThresh:
                         print('right')
                         direction = 'right'
@@ -387,19 +388,21 @@ class Player(object):
                 self.lastAccel = accel
                 
                 if direction is not None:
-                    if self.currentNode is not None:
-                        self.goNodeExitWithLine(self.currentNode.getLineForDirection(direction))
-                    elif self.currentLine is not None:
-                        newLineDirection = self.currentLine.getDirectionForDirection(direction)
-                        if newLineDirection is not None:
-                            self.currentLineDirection = newLineDirection
+                    self.goInDirection(direction)
 
         for event in events:
-            if event.type == pygame.KEYDOWN:
-                if event.key == self.key1:
-                    self.goNodeExit()
-                # elif event.key == self.key2:
-                #     self.advanceNodeExit()
+            if event.type == pygame.KEYDOWN and self.keys is not None:
+                direction = None
+                if event.key == self.keys[0]:
+                    direction = 'up'
+                if event.key == self.keys[1]:
+                    direction = 'down'
+                if event.key == self.keys[2]:
+                    direction = 'left'
+                if event.key == self.keys[3]:
+                    direction = 'right'
+                if direction is not None:
+                    self.goInDirection(direction)
 
         # Rotation
         if self.currentNode is not None:
@@ -468,17 +471,17 @@ class Player(object):
         self.alive = True
         if self.move is not None:
             self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
-            # while self.move.poll():
-            #     self.ready = self.move.get_trigger() > 0
-            #     pressed, released = self.move.get_button_events()
-            #     if (pressed & psmove.Btn_MOVE):
-            #         self.alive = not self.alive
-            #         if self.alive:
-            #             self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
-            #             self.advanceToPixel(self.currentNode.pixel)
-            #         else:
-            #             self.move.set_leds(0, 0, 0)
-            #             self.removeFromAllPixels()
+            while self.move.poll():
+                self.ready = self.move.get_trigger() > 0
+                # pressed, released = self.move.get_button_events()
+                # if (pressed & psmove.Btn_MOVE):
+                #     self.alive = not self.alive
+                #     if self.alive:
+                #         self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
+                #         self.advanceToPixel(self.currentNode.pixel)
+                #     else:
+                #         self.move.set_leds(0, 0, 0)
+                #         self.removeFromAllPixels()
             self.move.update_leds()
         # for event in events:
         #     if event.type == pygame.KEYDOWN:
@@ -486,6 +489,14 @@ class Player(object):
         #             ...
         #         elif event.key == self.key2:
         #             ...
+
+    def goInDirection(self, direction):
+        if self.currentNode is not None:
+            self.goNodeExitWithLine(self.currentNode.getLineForDirection(direction))
+        elif self.currentLine is not None:
+            newLineDirection = self.currentLine.getDirectionForDirection(direction)
+            if newLineDirection is not None:
+                self.currentLineDirection = newLineDirection
 
     def advanceNodeExit(self):
         if self.currentNode:
@@ -511,18 +522,15 @@ class Player(object):
 
     def powerup(self):
         #self.length += 2
-        self.moveMultiplier += 0.3
+        self.moveMultiplier += 0.4 * 1/self.moveMultiplier
+        if self.moveMultiplier > 4:
+            self.moveMultiplier = 4
         collectSound.play()
-
-        global beatSpeed
-        beatSpeed -= 20
-        if beatSpeed < 200:
-            beatSpeed = 200
-        pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
 
     def pickupBall(self):
         self.hasBall = True
-        collectSound.play()
+        pickupSound.play()
+        self.pickupSound.play()
 
     def kill(self):
         if self.hasBall == True:
@@ -874,13 +882,18 @@ def resetGame():
     gameRunning = False
     gameEnded = False
     powerupCount = 0
-    for node in nodes:
-        node.pixel.reset()
-    for line in getAllLines():
-        for pixel in line.pixels:
-            pixel.reset()
+    for pixel in getAllPixels():
+        pixel.reset()
     for player in players:
         player.reset()
+    pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, 0)
+    pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 0)
+    pygame.time.set_timer(USEREVENT_ENDGAME_START, 0)
+    pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 0)
+    pygame.time.set_timer(USEREVENT_WARNING_1, 0)
+    pygame.time.set_timer(USEREVENT_WARNING_2, 0)
+    pygame.time.set_timer(USEREVENT_BLINK, 0)
+    pygame.time.set_timer(USEREVENT_BEAT, 0)
 
 def endGame(winner):
     print("Game ended")
@@ -892,11 +905,12 @@ def endGame(winner):
     if winner is not None:
         blinkColor = winner.color
         winSound.play()
+        winner.winSound.play()
     else:
         blinkColor = 0
         loseSound.play()
     pygame.time.set_timer(USEREVENT_BLINK, 400)
-    pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 5000)
+    pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 8000)
 
 def startGame():
     print("Game started")
@@ -913,8 +927,8 @@ def startGamePart2():
     beatSpeed = 700
     pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
     pygame.time.set_timer(USEREVENT_GAME_COMPLETE, 120000)
-    #pygame.time.set_timer(USEREVENT_WARNING_1, 130000)
-    #pygame.time.set_timer(USEREVENT_WARNING_2, 169000)
+    pygame.time.set_timer(USEREVENT_WARNING_1, 90000)
+    pygame.time.set_timer(USEREVENT_WARNING_2, 110000)
     powerupCount = 6
     strands[0].getPixels(True)[random.choice([180, 420])].setBall()
     for enemy in enemies:
@@ -931,6 +945,10 @@ def warning2():
 blinkCounter = 0
 blinkColor = 0
 def blink():
+    global gameEnded
+    if (gameEnded == False):
+        return
+
     global blinkCounter
     blinkCounter += 1
     for i, pixel in enumerate(getAllPixels()):
@@ -939,9 +957,19 @@ def blink():
 beatCounter = 0
 beatSpeed = 0
 def beat():
+    global gameEnded
+    if (gameEnded == True):
+        return
+
     global beatCounter
     beatCounter += 1
-    #beatSounds[beatCounter % len(beatSounds)].play()
+    beatSounds[beatCounter % len(beatSounds)].play()
+
+    global beatSpeed
+    beatSpeed -= 2
+    if beatSpeed < 200:
+        beatSpeed = 200
+    pygame.time.set_timer(USEREVENT_BEAT, beatSpeed) 
 
 
 ##
@@ -1005,23 +1033,23 @@ def getMove(serial):
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[0], 1, [255,0,170], moves[0], pygame.K_LSHIFT, pygame.K_q, pygame.mixer.Sound('sounds/270344_shoot-00.ogg')),
-    Player(True, nodes[3], 2, [255,0,0], moves[1], pygame.K_RSHIFT, pygame.K_w, pygame.mixer.Sound('sounds/270343_shoot-01.ogg')),
-    Player(True, nodes[8], 3, [0,200,255], moves[2], pygame.K_BACKQUOTE, pygame.K_e, pygame.mixer.Sound('sounds/270336_shoot-02.ogg')),
-    Player(True, nodes[11], 4, [200,255,0], moves[3], pygame.K_BACKSPACE, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[0], 1, [255,0,170], moves[0], [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
+    Player(True, nodes[3], 2, [255,0,0], moves[1], None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
+    Player(True, nodes[8], 3, [0,200,255], moves[2], None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
+    Player(True, nodes[11], 4, [200,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
 
-    # Player(True, nodes[4], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[5], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[6], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[7], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[8], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[9], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[10], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[11], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[12], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[13], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[14], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[15], 4, [170,255,0], moves[3], pygame.K_4, pygame.K_r, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[4], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[5], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[6], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[7], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[8], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[9], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[10], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[11], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[12], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[13], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[14], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    # Player(True, nodes[15], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
 ]
 ###
 
@@ -1038,13 +1066,16 @@ if args.enemies == True:
 
 ### SOUNDS
 beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds/beat2.ogg')]
+beatSounds[0].set_volume(0.2)
+beatSounds[1].set_volume(0.2)
 deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
 collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
-startSound = pygame.mixer.Sound('sounds/start.ogg')
-winSound = pygame.mixer.Sound('sounds/end.ogg')
+pickupSound = pygame.mixer.Sound('sounds/270341_pickup-04.ogg')
+startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
+winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
 loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
-warning1Sound = pygame.mixer.Sound('sounds/warning1.ogg')
-warning2Sound = pygame.mixer.Sound('sounds/warning2.ogg')
+warning1Sound = pygame.mixer.Sound('sounds/vo_30seconds.ogg')
+warning2Sound = pygame.mixer.Sound('sounds/vo_10seconds.ogg')
 
 ### MISC DECLARATIONS
 USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
@@ -1104,11 +1135,9 @@ while appRunning:
             player.updateOutOfGame(events)
 
         # Start game?
-        joinedPlayers = list(filter(lambda player: player.alive, players))
-        if len(joinedPlayers) >= 2:
-            readyPlayers = list(filter(lambda player: player.ready, joinedPlayers))
-            if len(readyPlayers) == len(joinedPlayers): #or len(joinedPlayers) == len(players):
-                startGame()
+        readyPlayers = list(filter(lambda player: player.ready, players))
+        if len(readyPlayers) > 1 and len(readyPlayers) == len(players):
+            startGame()
 
     for event in events:
         if event.type == USEREVENT_STARTGAME_COMPLETE:
@@ -1129,8 +1158,6 @@ while appRunning:
             endGame(winner)
 
         elif event.type == USEREVENT_ENDGAME_COMPLETE:
-            pygame.time.set_timer(USEREVENT_ENDGAME_COMPLETE, 0)
-            pygame.time.set_timer(USEREVENT_BLINK, 0)
             resetGame()
 
         elif event.type == USEREVENT_BLINK:
@@ -1148,6 +1175,8 @@ while appRunning:
             if event.key == pygame.K_RETURN:
                 if gameRunning == False:
                     startGame()
+                else:
+                    resetGame()
 
             if event.key == pygame.K_z:
                 currentFX = None
