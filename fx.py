@@ -97,11 +97,12 @@ def randomColor():
 	return wheel(random.randint(0, 255))
 
 def wheel(pos):
-    if pos < 85:
-        return (pos * 3, 255 - pos * 3, 0)
-    elif pos < 170:
-        pos -= 85
-        return (255 - pos * 3, 0, pos * 3)
-    elif pos < 256:
-        pos -= 170
-        return (0, pos * 3, 255 - pos * 3)
+	pos = pos % 256
+	if pos < 85:
+		return (pos * 3, 255 - pos * 3, 0)
+	elif pos < 170:
+		pos -= 85
+		return (255 - pos * 3, 0, pos * 3)
+	elif pos < 256:
+		pos -= 170
+		return (0, pos * 3, 255 - pos * 3)
