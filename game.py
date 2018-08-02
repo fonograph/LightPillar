@@ -207,9 +207,13 @@ class Pixel(object):
         self.alphaOverride = None
         self.player = None
         self.playerCapture = None
+        self.playerCaptureTime = 0
+        self.lastPlayer = None
+        self.lastPlayerTime = None
         self.powerup = False
         self.ball = False
         self.pulseTicker = 0;
+        self.sparkleSeed = random.random()
 
     def getData(self):
         color = self.getColor()
@@ -226,6 +230,8 @@ class Pixel(object):
         self.player = player
         self.color = player.color
         self.alpha = alpha
+        self.lastPlayer = player
+        self.lastPlayerTime = pygame.time.get_ticks()
         if player.hasBall == True:
             self.playerCapture = player
             self.playerCaptureTime = pygame.time.get_ticks()
@@ -271,7 +277,12 @@ class Pixel(object):
     def update(self):
         if self.playerCapture is not None and self.player is None:
             self.color = self.playerCapture.color
-            self.alpha = 0.75 - min(1, (pygame.time.get_ticks() - self.playerCaptureTime)/750) * 0.5
+            self.alpha = 0.75 - min(1, (pygame.time.get_ticks() - self.playerCaptureTime)/750) * 0.6
+            self.alpha += math.sin( (pygame.time.get_ticks() % (2000 + self.sparkleSeed*8000)) / (2000 + self.sparkleSeed*8000) * 6.28 ) * 0.1 + 0.1
+        elif self.lastPlayer is not None and self.player is None:
+            self.color = self.lastPlayer.color
+            self.alpha = 0.5 - min(1, (pygame.time.get_ticks() - self.lastPlayerTime)/150) * 0.5
+        self.alpha = min(1, self.alpha)
 
     def pulse(self, accum):
         accum = accum % 200
@@ -916,9 +927,9 @@ def startGame():
     print("Game started")
     global gameRunning
     gameRunning = True
-    startGamePart2()
-    #startSound.play()
-    #pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
+    startSound.play()
+    pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
+    #startGamePart2()
 
 def startGamePart2():
     global beatSpeed
@@ -1071,7 +1082,7 @@ beatSounds[1].set_volume(0.2)
 deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
 collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
 pickupSound = pygame.mixer.Sound('sounds/270341_pickup-04.ogg')
-startSound = pygame.mixer.Sound('sounds/270319_jingle-win-01.ogg')
+startSound = pygame.mixer.Sound('sounds/start.ogg')
 winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
 loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
 warning1Sound = pygame.mixer.Sound('sounds/vo_30seconds.ogg')
