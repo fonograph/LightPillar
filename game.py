@@ -663,14 +663,14 @@ class Strand(object):
                 self.things += [line]
         self.vizPoints = vizLayout
         self.strip = None
-        self.linkStrand = None
+        self.linkStrands = None
 
         if loop == True:
             self.things[0].line1 = self.things[-1]
             self.things[-1].line2 = self.things[0]
 
-    def initPixels(self, linkStrand = None):
-        self.linkStrand = linkStrand
+    def initPixels(self, linkStrands = None):
+        self.linkStrands = linkStrands
         if pixelsAvailable and self.pin is not None:
             pixelCount = len(self.getPixels(True))
             self.strip = Adafruit_NeoPixel(pixelCount, self.pin, 800000, 10, False, 255, self.channel, ws.WS2812_STRIP)
@@ -684,8 +684,9 @@ class Strand(object):
         for thing in self.things:
             px += thing.pixels
 
-        if withLinks == True and self.linkStrand is not None:
-            px += self.linkStrand.getPixels(True)
+        if withLinks == True and self.linkStrands is not None:
+            for strand in self.linkStrands:
+                px += strand.getPixels(True)
 
         return px
 
@@ -997,10 +998,7 @@ strands = [
     Strand(120, True, 'right', None, None, layout.data[4]),
 ]
 strands[0].initPixels()
-strands[1].initPixels(strands[2])
-strands[2].initPixels(strands[3])
-strands[3].initPixels(strands[4])
-strands[4].initPixels()
+strands[1].initPixels([strands[2], strands[3], strands[4]])
 
 nodes = [
     createNode('up', strands[0], 23, strands[1], 5),
