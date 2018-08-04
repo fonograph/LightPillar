@@ -776,7 +776,7 @@ class Strand(object):
                     elif (color == 7):
                       self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
                     elif (color == 8):
-                        color = wheel(pygame.time.get_ticks()/2)
+                        color = wheel(round(pygame.time.get_ticks()/2))
                         self.strip.setPixelColor(i, Color(color[0], color[1], color[2]))
 
             self.strip.show()
