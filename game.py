@@ -4,6 +4,7 @@ import random
 import serial
 import json
 import time
+import re
 import sys
 import math
 import argparse
