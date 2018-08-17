@@ -994,11 +994,10 @@ def devicenum(device_path):
 if gamepadsAvailable:
     devices = sorted(list_devices('/dev/input'), key=devicenum)
     devices = devices = [InputDevice(path) for path in devices]
-    gamepads = []
     i = 0
     for device in devices:
         if 'Shinecon' in device.name:
-            gamepads[i] += [device]
+            gamepads[i] = device
             i += 1
 
 ###
