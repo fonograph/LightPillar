@@ -11,6 +11,11 @@ from fx import *
 sys.path.insert(0, '/Projects/psmoveapi/build');
 import psmove
 try:
+    from evdev import InputDevice, categorize, ecodes, list_devices
+    gamepadsAvailable = True
+except ImportError:
+    gamepadsAvailable = False
+try:
     from neopixel import *
     pixelsAvailable = True
 except ImportError:
@@ -294,12 +299,12 @@ class Pixel(object):
 
 class Player(object):
 
-    def __init__(self, captures, startingNode, colorId, colorValue = None, move = None, keys = None, nodeExitSound = None, pickupSound = None, winSound = None):
+    def __init__(self, captures, startingNode, colorId, colorValue = None, gamepad = None, keys = None, nodeExitSound = None, pickupSound = None, winSound = None):
         self.captures = captures
         self.startingNode = startingNode
         self.color = colorId
         self.colorValue = colorValue
-        self.move = move
+        self.gamepad = gamepad
         self.keys = keys
         self.nodeExitSound = nodeExitSound
         self.pickupSound = pickupSound
@@ -309,9 +314,6 @@ class Player(object):
     def reset(self):
         self.spawnAtNode(self.startingNode, False)
         self.ready = False # for starting the game
-        if self.move is not None:
-            self.move.set_leds(0, 0, 0)
-            self.move.update_leds()
 
     def spawnAtNode(self, node, alive):
         self.currentLine = None
@@ -333,10 +335,6 @@ class Player(object):
         self.lastAccel = None
         self.lastMoveTime = 0
 
-        if self.alive and self.move is not None:
-            self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
-            self.move.update_leds()
-
         self.advanceToPixel(self.currentNode.pixel)
 
 
@@ -353,53 +351,25 @@ class Player(object):
             return
 
         # Controls
-        if self.move is not None:
-            while self.move.poll():
-                #print(self.move.az)
-                #print(self.move.get_accelerometer_frame(psmove.Frame_FirstHalf)[2])
-                
-                pressed, released = self.move.get_button_events()
-                
-                # if pressed & psmove.Btn_T:
-                #     self.goNodeExit()
-                # elif pressed & (psmove.Btn_TRIANGLE | psmove.Btn_CIRCLE | psmove.Btn_SQUARE | psmove.Btn_CROSS | psmove.Btn_MOVE):
-                #     self.advanceNodeExit()
+        if self.gamepad is not None:
 
-                direction = None
+            direction = None
 
-                # if pressed & psmove.Btn_TRIANGLE:
-                #     direction = 'up'
-                # elif pressed & psmove.Btn_CIRCLE:
-                #     direction = 'right'
-                # elif pressed & psmove.Btn_CROSS:
-                #     direction = 'down'
-                # elif pressed & psmove.Btn_SQUARE:
-                #     direction = 'left'
-
-                aThresh = 1.5
-                accel = self.move.get_accelerometer_frame(psmove.Frame_FirstHalf)
-                accel[2] -= 1
-                if self.move.get_trigger() > 0 and self.lastAccel is not None and pygame.time.get_ticks() - self.lastMoveTime > 500:
-                    if accel[0] > aThresh:
-                        print('right')
-                        direction = 'right'
-                        self.lastMoveTime = pygame.time.get_ticks()
-                    if accel[0] < -aThresh:
-                        print('left')
-                        direction = 'left'
-                        self.lastMoveTime = pygame.time.get_ticks()
-                    if accel[2] > aThresh:
-                        print('up')
+            event = self.gamepad.read_one()
+            while event is not None:
+                if event.type == ecodes.EV_KEY and event.value == 1:
+                    if event.code == ecodes.KEY_UP:
                         direction = 'up'
-                        self.lastMoveTime = pygame.time.get_ticks()
-                    if accel[2] < -aThresh:
-                        print('down')
+                    if event.code == ecodes.KEY_DOWN:
                         direction = 'down'
-                        self.lastMoveTime = pygame.time.get_ticks()
-                self.lastAccel = accel
-                
-                if direction is not None:
-                    self.goInDirection(direction)
+                    if event.code == ecodes.KEY_LEFT:
+                        direction = 'left'
+                    if event.code == ecodes.KEY_RIGHT:
+                        direction = 'right'
+                event = self.gamepad.read_one() # loop until we exhaust waiting events
+            
+            if direction is not None:
+                self.goInDirection(direction)
 
         for event in events:
             if event.type == pygame.KEYDOWN and self.keys is not None:
@@ -427,7 +397,7 @@ class Player(object):
 
         # Movement
         if self.currentLine is not None:
-            self.moveAccum += 10 * self.moveMultiplier
+            self.moveAccum += 12 * self.moveMultiplier
 
             # determine next position
             nextLineIndex = self.currentLineIndex + self.currentLineDirection
@@ -474,32 +444,21 @@ class Player(object):
                 self.pulseAccum += 10
             self.pixels[0].pulse(self.pulseAccum)
 
-        if self.move is not None:
-            self.move.update_leds()
-
     def updateOutOfGame(self, events):
         self.advanceToPixel(self.currentNode.pixel)
         self.alive = True
-        if self.move is not None:
-            self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
-            while self.move.poll():
-                self.ready = self.move.get_trigger() > 0
-                # pressed, released = self.move.get_button_events()
-                # if (pressed & psmove.Btn_MOVE):
-                #     self.alive = not self.alive
-                #     if self.alive:
-                #         self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
-                #         self.advanceToPixel(self.currentNode.pixel)
-                #     else:
-                #         self.move.set_leds(0, 0, 0)
-                #         self.removeFromAllPixels()
-            self.move.update_leds()
-        # for event in events:
-        #     if event.type == pygame.KEYDOWN:
-        #         if event.key == self.key1:
-        #             ...
-        #         elif event.key == self.key2:
-        #             ...
+        if self.gamepad is not None:
+            self.ready = ecodes.KEY_UP in self.gamepad.active_keys()
+            
+            # pressed, released = self.move.get_button_events()
+            # if (pressed & psmove.Btn_MOVE):
+            #     self.alive = not self.alive
+            #     if self.alive:
+            #         self.move.set_leds(self.colorValue[0], self.colorValue[1], self.colorValue[2])
+            #         self.advanceToPixel(self.currentNode.pixel)
+            #     else:
+            #         self.move.set_leds(0, 0, 0)
+            #         self.removeFromAllPixels()
 
     def goInDirection(self, direction):
         if self.currentNode is not None:
@@ -672,7 +631,7 @@ class Strand(object):
     def initPixels(self, linkStrands = None):
         self.linkStrands = linkStrands
         if pixelsAvailable and self.pin is not None:
-            pixelCount = len(self.getPixels(True))
+            pixelCount = len(self.getPixels(True)) + 30
             self.strip = Adafruit_NeoPixel(pixelCount, self.pin, 800000, 10, False, 255, self.channel, ws.WS2812_STRIP)
             self.strip.begin()
             for i in range(pixelCount):
@@ -1023,42 +982,41 @@ nodes = [
 ]   
 ### 
 
-### PSMOVE CONFIG
-moves = []
-for x in range(4):
-    if x < psmove.count_connected():
-        moves += [psmove.PSMove(x)]
-    else:
-        moves += [None]
+### GAMEPAD CONFIG
 
-def getMove(serial):
-    global moves
-    for move in moves:
-        if move is not None and move.get_serial() == serial:
-            return move
-    print('Could not find move ', serial)
-    return None
+gamepads = [None, None, None, None]
+
+if gamepadsAvailable:
+    devices = sorted(list_devices('/dev/input'), key=devicenum)
+    devices = devices = [InputDevice(path) for path in devices]
+    gamepads = []
+    i = 0
+    for device in devices
+        if 'Shinecon' is in device.name:
+            gamepads[i] += [device]
+            i += 1
+
 ###
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[0], 1, [255,0,170], moves[0], [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
-    Player(True, nodes[3], 2, [255,0,0], moves[1], None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
-    Player(True, nodes[8], 3, [0,200,255], moves[2], None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
-    Player(True, nodes[11], 4, [200,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
+    Player(True, nodes[0], 1, [255,0,170], gamepads[0], [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
+    Player(True, nodes[3], 2, [255,0,0], gamepads[1], None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
+    Player(True, nodes[8], 3, [0,200,255], gamepads[2], None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
+    Player(True, nodes[11], 4, [200,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
 
-    # Player(True, nodes[4], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[5], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[6], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[7], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[8], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[9], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[10], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[11], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[12], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[13], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[14], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    # Player(True, nodes[15], 4, [170,255,0], moves[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[4], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[5], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[6], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[7], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[8], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[9], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[10], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[11], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[12], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[13], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[14], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[15], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
 ]
 ###
 
