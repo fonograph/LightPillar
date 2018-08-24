@@ -530,9 +530,6 @@ class Player(object):
         self.hasBall = False
         self.respawnAccum = 0
         self.removeFromAllPixels()
-        if self.move is not None:
-            self.move.set_leds(0, 0, 0)
-            self.move.update_leds()
         deathSound.play()
 
     def advanceToPixel(self, newPixel):
