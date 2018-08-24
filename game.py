@@ -26,6 +26,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--noviz', action='store_const', const=True)
 parser.add_argument('--full', action='store_const', const=True)
 parser.add_argument('--enemies', action='store_const', const=True)
+parser.add_argument('--nodecheck', action='store_const', const=True)
 args = parser.parse_args()
 
 
@@ -218,7 +219,6 @@ class Pixel(object):
         self.lastPlayerTime = None
         self.powerup = False
         self.ball = False
-        self.pulseTicker = 0;
         self.sparkleSeed = random.random()
 
     def getData(self):
@@ -283,18 +283,19 @@ class Pixel(object):
     def update(self):
         if self.playerCapture is not None and self.player is None:
             self.color = self.playerCapture.color
-            self.alpha = 0.75 - min(1, (pygame.time.get_ticks() - self.playerCaptureTime)/750) * 0.6
+            self.alpha = 0.75 - min(1, (pygame.time.get_ticks() - self.playerCaptureTime)/750) * 0.7
             self.alpha += math.sin( (pygame.time.get_ticks() % (2000 + self.sparkleSeed*8000)) / (2000 + self.sparkleSeed*8000) * 6.28 ) * 0.1 + 0.1
         elif self.lastPlayer is not None and self.player is None:
             self.color = self.lastPlayer.color
             self.alpha = 0.5 - min(1, (pygame.time.get_ticks() - self.lastPlayerTime)/150) * 0.5
         self.alpha = min(1, self.alpha)
 
-    def pulse(self, accum):
-        accum = accum % 200
+    def pulse(self, speed):
+        accum = (pygame.time.get_ticks() * speed * 0.4) % 200
         if accum > 100:
             accum = 200 - accum
-        self.alpha = max((0.1 + accum/100*0.9) ** 1, 0.2)
+        #self.alpha = max((0.1 + accum/100*0.9) ** 1, 0.2)
+        self.alpha = 1 if accum > 40 else 0
 
 ##
 
@@ -332,16 +333,15 @@ class Player(object):
         self.length = 1
         self.respawnAccum = 0
         self.alive = alive
-        self.pulseAccum = 0
         self.lastAccel = None
         self.lastMoveTime = 0
 
         self.advanceToPixel(self.currentNode.pixel)
 
 
-    def update(self, events = []):
+    def update(self, events = [], delta = 33):
         if not self.alive:
-            self.respawnAccum += 1
+            self.respawnAccum += 0.03 * delta
             if self.respawnAccum >= 100:
                 for node in reversed(self.visitedNodes):
                     if node.hasNoPlayers() == True:
@@ -398,7 +398,7 @@ class Player(object):
 
         # Movement
         if self.currentLine is not None:
-            self.moveAccum += 12 * self.moveMultiplier
+            self.moveAccum += 0.36 * delta * self.moveMultiplier 
 
             # determine next position
             nextLineIndex = self.currentLineIndex + self.currentLineDirection
@@ -439,11 +439,7 @@ class Player(object):
                         self.visitedNodes.append(self.currentNode)
 
         if self.currentNode is not None:
-            if self.hasBall == True:
-                self.pulseAccum += 20
-            else:
-                self.pulseAccum += 10
-            self.pixels[0].pulse(self.pulseAccum)
+            self.pixels[0].pulse(2 if self.hasBall == True else 1)
 
     def updateOutOfGame(self, events):
         self.advanceToPixel(self.currentNode.pixel)
@@ -985,7 +981,7 @@ nodes = [
 
 ### GAMEPAD CONFIG
 
-gamepads = [None, None, None, None]
+gamepads = []
 
 def devicenum(device_path):
         digits = re.findall(r'\d+$', device_path)
@@ -994,34 +990,41 @@ def devicenum(device_path):
 if gamepadsAvailable:
     devices = sorted(list_devices('/dev/input'), key=devicenum)
     devices = devices = [InputDevice(path) for path in devices]
-    i = 0
     for device in devices:
         if 'Shinecon' in device.name:
-            gamepads[i] = device
-            i += 1
+            gamepads += [device]
+
+def getGamepad(name):
+    for gamepad in gamepads:
+        if name in gamepad.name:
+            return gamepad
+    return None
 
 ###
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[0], 1, [255,0,170], gamepads[0], [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
-    Player(True, nodes[3], 2, [255,0,0], gamepads[1], None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
-    Player(True, nodes[8], 3, [0,200,255], gamepads[2], None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
-    Player(True, nodes[11], 4, [200,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
-
-    Player(True, nodes[4], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[5], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[6], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[7], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[8], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[9], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[10], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[11], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[12], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[13], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[14], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
-    Player(True, nodes[15], 4, [170,255,0], gamepads[3], None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    Player(True, nodes[0], 1, [255,0,170], getGamepad('VR Shinecon-967A'), [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
+    Player(True, nodes[3], 2, [255,0,0], getGamepad('VR Shinecon-8818'), None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
+    Player(True, nodes[8], 3, [0,200,255], getGamepad('VR Shinecon-8C91'), None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
+    Player(True, nodes[11], 4, [200,255,0], getGamepad('VR Shinecon-0ED9'), None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
 ]
+
+if (args.nodecheck == True):
+    players += [
+        Player(True, nodes[4], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[5], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[6], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[7], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[8], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[9], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[10], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[11], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[12], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[13], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[14], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+        Player(True, nodes[15], 4, [170,255,0], None, None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg')),
+    ]
 ###
 
 ### ENEMIES
@@ -1087,7 +1090,7 @@ while appRunning:
     if gameRunning:
         if not gameEnded:
             for player in players:
-                player.update(events)
+                player.update(events, clock.get_time())
 
             for enemy in enemies:
                 enemy.update()
