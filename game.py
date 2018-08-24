@@ -1004,10 +1004,10 @@ def getGamepad(name):
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[0], 1, [255,0,170], getGamepad('VR Shinecon-967A'), [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
-    Player(True, nodes[3], 2, [255,0,0], getGamepad('VR Shinecon-8818'), None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
-    Player(True, nodes[8], 3, [0,200,255], getGamepad('VR Shinecon-8C91'), None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
-    Player(True, nodes[11], 4, [200,255,0], getGamepad('VR Shinecon-0ED9'), None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
+    Player(True, nodes[0], 1, [255,0,170], getGamepad('967A'), [pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
+    Player(True, nodes[3], 2, [255,0,0], getGamepad('8818'), None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
+    Player(True, nodes[8], 3, [0,200,255], getGamepad('8C91'), None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
+    Player(True, nodes[11], 4, [200,255,0], getGamepad('0ED9'), None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
 ]
 
 if (args.nodecheck == True):
