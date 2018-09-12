@@ -64,7 +64,7 @@ class Node(object):
         for pixel in self.pixels:
             pixel.unsetCapture()
         for line in self.lines:
-            line.clearCaptures()
+            line.pixels[line.getFirstPixelIndexFromNode(self)].unsetCapture()
 
     def hasNoPlayers(self):
         # also includes connected lines
@@ -232,10 +232,10 @@ class Pixel(object):
     def getAlpha(self):
         return self.alpha if self.alphaOverride is None else self.alphaOverride
 
-    def setPlayer(self, player, alpha):
+    def setPlayer(self, player):
         self.player = player
         self.color = player.color
-        self.alpha = alpha
+        self.alpha = 2
         self.lastPlayer = player
         self.lastPlayerTime = pygame.time.get_ticks()
         if player.hasBall == True:
@@ -295,7 +295,7 @@ class Pixel(object):
         if accum > 100:
             accum = 200 - accum
         #self.alpha = max((0.1 + accum/100*0.9) ** 1, 0.2)
-        self.alpha = 1 if accum > 40 else 0
+        self.alpha = 2 if accum > 40 else 0
 
 ##
 
@@ -345,6 +345,7 @@ class Player(object):
             if self.respawnAccum >= 100:
                 for node in reversed(self.visitedNodes):
                     if node.hasNoPlayers() == True:
+                        node.clearCaptures()
                         self.spawnAtNode(node, True)
                         break
         
@@ -400,27 +401,28 @@ class Player(object):
         if self.currentLine is not None:
             self.moveAccum += 0.36 * delta * self.moveMultiplier 
 
-            # determine next position
-            nextLineIndex = self.currentLineIndex + self.currentLineDirection
-            atConnection = self.currentLine.isIndexAtConnection(nextLineIndex)
-            nextPixel = None
-            nextLine = None
-            nextNode = None
-            nextLineDirection = None
-            if atConnection is None:
-                nextPixel = self.currentLine.pixels[nextLineIndex]
-            elif isinstance(atConnection, Line):
-                nextLine = atConnection
-                nextPixel = nextLine.pixels[nextLine.getFirstPixelIndexFromLine(self.currentLine)]
-                nextLineIndex = nextLine.getFirstPixelIndexFromLine(self.currentLine)
-                nextLineDirection = nextLine.getDirectionFromLine(self.currentLine)
-            elif isinstance(atConnection, Node):
-                nextNode = atConnection
-                nextPixel = nextNode.pixel
-
             targetAccum = 20
-            if (self.moveAccum >= targetAccum):
+
+            while (self.moveAccum >= targetAccum):
                 self.moveAccum -= targetAccum
+
+                # determine next position
+                nextLineIndex = self.currentLineIndex + self.currentLineDirection
+                atConnection = self.currentLine.isIndexAtConnection(nextLineIndex)
+                nextPixel = None
+                nextLine = None
+                nextNode = None
+                nextLineDirection = None
+                if atConnection is None:
+                    nextPixel = self.currentLine.pixels[nextLineIndex]
+                elif isinstance(atConnection, Line):
+                    nextLine = atConnection
+                    nextPixel = nextLine.pixels[nextLine.getFirstPixelIndexFromLine(self.currentLine)]
+                    nextLineIndex = nextLine.getFirstPixelIndexFromLine(self.currentLine)
+                    nextLineDirection = nextLine.getDirectionFromLine(self.currentLine)
+                elif isinstance(atConnection, Node):
+                    nextNode = atConnection
+                    nextPixel = nextNode.pixel
 
                 if self.advanceToPixel(nextPixel):
                     if atConnection is None:
@@ -489,9 +491,9 @@ class Player(object):
 
     def powerup(self):
         #self.length += 2
-        self.moveMultiplier += 0.4 * 1/self.moveMultiplier
-        if self.moveMultiplier > 4:
-            self.moveMultiplier = 4
+        self.moveMultiplier += 0.3 * 1/self.moveMultiplier
+        if self.moveMultiplier > 3:
+            self.moveMultiplier = 3
         collectSound.play()
 
     def pickupBall(self):
@@ -560,7 +562,7 @@ class Player(object):
             self.pixels = self.pixels[1:]
 
         for i, pixel in enumerate(self.pixels):
-            pixel.setPlayer(self, (i+1)/len(self.pixels))
+            pixel.setPlayer(self)
 
         return True
 
@@ -704,34 +706,50 @@ class Strand(object):
 
     def writePixels(self):        
         if self.strip is not None:
+            amps = 0
+            pixels = 0
             for i, pixel in enumerate(self.getPixels(True)):
 
-                if currentFX is not None:
-                    color = currentFX.getPixel(i)
+                if attractMode == True:
+                    color = attractCycleFX.getPixel(i)
                     self.strip.setPixelColor(i, Color(color[0], color[1], color[2]))
 
                 else:
                     color = pixel.getColor()
                     alpha = pixel.getAlpha() * 255
+                    c = 0
                     if (color == 0):
-                      self.strip.setPixelColor(i, Color(0, 0, 0))
+                        c = Color(0, 0, 0)
                     elif (color == 1):
-                      self.strip.setPixelColor(i, Color(round(alpha/2), 0, round(alpha*0.5/2)))
+                        c = Color(round(alpha/2), 0, round(alpha*0.5/2))
                     elif (color == 2):
-                      self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
+                        c = Color(round(alpha/2), 0, 0)
                     elif (color == 3):
-                      self.strip.setPixelColor(i, Color(0, round(alpha/2), round(alpha/2)))
+                        c = Color(0, round(alpha/2), round(alpha/2))
                     elif (color == 4):
-                      self.strip.setPixelColor(i, Color(round(alpha*0.8/2), round(alpha/2), 0))
+                        c = Color(round(alpha*0.8/2), round(alpha/2), 0)
                     elif (color == 5):
-                      self.strip.setPixelColor(i, Color(round(alpha/3), round(alpha/3), round(alpha/3)))
+                        c = Color(round(alpha/3), round(alpha/3), round(alpha/3))
                     elif (color == 6):
-                      self.strip.setPixelColor(i, Color(0, round(alpha), 0))
+                        c = Color(0, round(alpha), 0)
                     elif (color == 7):
-                      self.strip.setPixelColor(i, Color(round(alpha), 0, 0))
+                        c = Color(round(alpha), 0, 0)
                     elif (color == 8):
                         color = wheel(round(pygame.time.get_ticks()/2))
-                        self.strip.setPixelColor(i, Color(color[0], color[1], color[2]))
+                        c = Color(color[0], color[1], color[2])
+
+                    amps += ((c>>16)&255)*0.02 + ((c>>8)&255)*0.02 + (c&255)*0.02
+
+                    if amps > 1.2:
+                        print("AMP OVERAGE")
+                        c = Color(0, 0, 0)
+
+                    pixels += 1
+                    if pixels == 60:
+                        pixels = 0
+                        amps = 0
+
+                    self.strip.setPixelColor(i, c)
 
             self.strip.show()
 
@@ -755,9 +773,9 @@ class Strand(object):
                     color = wheel(round(pygame.time.get_ticks()/2))
                 else:
                     color = VIZ_COLORS[pixel.getColor()]
-                alpha = pixel.getAlpha() ** 0.3
-                if currentFX is not None:
-                    color = currentFX.getPixel(i)
+                alpha = min(pixel.getAlpha() ** 0.3, 1)
+                if attractMode == True:
+                    color = attractCycleFX.getPixel(i)
                 else:
                     color = (color[0] * alpha, color[1] * alpha, color[2] * alpha)
                 pygame.draw.circle(screen, color, [int(start[0] + dist*vector[0]), int(start[1] + dist*vector[1])], 5)
@@ -880,7 +898,9 @@ def endGame(winner):
 def startGame():
     print("Game started")
     global gameRunning
+    global attractMode
     gameRunning = True
+    attractMode = False
     startSound.play()
     pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
     #startGamePart2()
@@ -1001,7 +1021,7 @@ def getGamepad(name):
 
 ### PLAYER CONFIG
 players = [
-    Player(True, nodes[0], 1, [255,0,170], getGamepad('967A'), [pygame.K_w, pygame.K_a, pygame.K_s, pygame.K_d], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
+    Player(True, nodes[0], 1, [255,0,170], getGamepad('967A'), [pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d], pygame.mixer.Sound('sounds/270344_shoot-00.ogg'), pygame.mixer.Sound('sounds/vo_ball_pink.ogg'), pygame.mixer.Sound('sounds/vo_win_pink.ogg')),
     Player(True, nodes[3], 2, [255,0,0], getGamepad('8818'), None, pygame.mixer.Sound('sounds/270343_shoot-01.ogg'), pygame.mixer.Sound('sounds/vo_ball_red.ogg'), pygame.mixer.Sound('sounds/vo_win_red.ogg')),
     Player(True, nodes[8], 3, [0,200,255], getGamepad('8C91'), None, pygame.mixer.Sound('sounds/270336_shoot-02.ogg'), pygame.mixer.Sound('sounds/vo_ball_blue.ogg'), pygame.mixer.Sound('sounds/vo_win_blue.ogg')),
     Player(True, nodes[11], 4, [200,255,0], getGamepad('0ED9'), None, pygame.mixer.Sound('sounds/270335_shoot-03.ogg'), pygame.mixer.Sound('sounds/vo_ball_yellow.ogg'), pygame.mixer.Sound('sounds/vo_win_yellow.ogg')),
@@ -1062,7 +1082,11 @@ appRunning = True
 gameRunning = False
 gameEnded = False
 powerupCount = 0
-currentFX = None
+
+attractMode = False
+attractCycleIndex = 0
+attractCycleTime = 0
+attractCycleFX = None
 ###
 
 
@@ -1082,7 +1106,7 @@ while appRunning:
 
     clock.tick(30)
 
-    events = pygame.event.get();
+    events = pygame.event.get()
 
     if gameRunning:
         if not gameEnded:
@@ -1148,17 +1172,10 @@ while appRunning:
                     startGame()
                 else:
                     resetGame()
-
-            if event.key == pygame.K_z:
-                currentFX = None
-            if event.key == pygame.K_x:
-                currentFX = FXAmbient(1)
-            if event.key == pygame.K_c:
-                currentFX = FXStartup()
-            if event.key == pygame.K_v:
-                currentFX = FXPulse(1, [255, 0, 0])
-            if event.key == pygame.K_b:
-                currentFX = FXTrail(5, 5, 0.5, [255, 0, 0])
+            if event.key == pygame.K_a and gameRunning == False:
+                attractMode = True
+                attractCycleIndex = 0 
+                attractCycleTime = -99999999
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             layout.handleMouseDown(event.pos)
@@ -1168,8 +1185,20 @@ while appRunning:
             layout.handleMouseMove(event.pos)
 
 
-    if currentFX is not None:
-        currentFX.update()
+    if attractMode == True:
+        if pygame.time.get_ticks() > attractCycleTime + 20000:
+            attractCycleTime = pygame.time.get_ticks()
+            if attractCycleIndex == 0:
+                attractCycleFX = FXAmbient(1)
+            elif attractCycleIndex == 1:
+                attractCycleFX = FXPulse(1, [255, 0, 0])
+            elif attractCycleIndex == 2:
+                attractCycleFX = FXTrail(5, 5, 0.5, [255, 0, 0])
+
+
+    if attractCycleFX is not None:
+        attractCycleFX.update()
+
 
     for strand in strands:
         strand.writePixels()
