@@ -738,6 +738,10 @@ class Strand(object):
                         color = wheel(round(pygame.time.get_ticks()/2))
                         c = Color(color[0], color[1], color[2])
 
+                    print((c>>16)&255)
+                    print((c>>8)&255)
+                    print((c>>0)&255)
+                    print(((c>>16)&255)*0.02 + ((c>>8)&255)*0.02 + (c&255)*0.0)
                     amps += ((c>>16)&255)*0.02 + ((c>>8)&255)*0.02 + (c&255)*0.02
 
                     if amps > 1.2:
