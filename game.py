@@ -1184,10 +1184,6 @@ while appRunning:
                     startGame()
                 else:
                     resetGame()
-            if event.key == pygame.K_a and gameRunning == False:
-                attractMode = True
-                attractCycleIndex = 0 
-                attractCycleTime = -99999999
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             layout.handleMouseDown(event.pos)
