@@ -1197,18 +1197,14 @@ while appRunning:
         attractMode = True
     if attractMode == True:
         if pygame.time.get_ticks() > attractCycleTime:
-            totalCycles = 5
+            totalCycles = 3
             attractCycleIndex += 1
             attractCycleTime = pygame.time.get_ticks() + 10000
             if attractCycleIndex % totalCycles == 0:
-                attractCycleFX = FXAmbient(1)
-            elif attractCycleIndex % totalCycles == 1:
-                attractCycleFX = FXPulse(1, None)
-            elif attractCycleIndex % totalCycles == 2:
                 attractCycleFX = FXTrail(5, 5, 0.5, None)
-            elif attractCycleIndex % totalCycles == 3:
+            elif attractCycleIndex % totalCycles == 1:
                 attractCycleFX = FXFunky()
-            elif attractCycleIndex % totalCycles == 4:
+            elif attractCycleIndex % totalCycles == 2:
                 attractCycleFX = FXPulse(4, (85, 85, 85))
                 vo = attractVOs[random.randrange(0, len(attractVOs))]
                 vo.play()
