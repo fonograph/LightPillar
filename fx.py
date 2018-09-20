@@ -1,4 +1,5 @@
 import random
+import math
 
 class FX(object):
 
@@ -13,6 +14,8 @@ class FXPulse(FX):
 
 	def __init__(self, speed, color):
 		FX.__init__(self)
+		if color is None:
+			color = randomColor()
 		self.color = color
 		self.speed = speed
 
@@ -63,6 +66,8 @@ class FXTrail(FX):
 
 	def __init__(self, lengthOn, lengthOff, speed, color):
 		FX.__init__(self)
+		if color is None:
+			color = randomColor()
 		self.color = color
 		self.lengthOn = lengthOn
 		self.lengthOff = lengthOff
@@ -91,6 +96,13 @@ class FXAmbient(FX):
 	def getPixel(self, i):
 		return wheel((i+(self.frame*self.speed)) % 256)
 
+class FXFunky(FX):
+
+	def getPixel(self, i):
+		color = wheel((i+(self.frame)) % 256)
+		alpha = math.sin((i+self.frame)*0.1) * 0.5 + 0.5
+		color = (round(color[0]*alpha), round(color[1]*alpha), round(color[2]*alpha))
+		return color
 
 
 def randomColor():

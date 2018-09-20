@@ -343,11 +343,9 @@ class Player(object):
         if not self.alive:
             self.respawnAccum += 0.03 * delta
             if self.respawnAccum >= 100:
-                for node in reversed(self.visitedNodes):
-                    if node.hasNoPlayers() == True:
-                        node.clearCaptures()
-                        self.spawnAtNode(node, True)
-                        break
+                if self.visitedNodes[-1].hasNoPlayers() == True:
+                    self.visitedNodes[-1].clearCaptures()
+                    self.spawnAtNode(self.visitedNodes[-1], True)
         
         if not self.alive:
             return
@@ -399,7 +397,10 @@ class Player(object):
 
         # Movement
         if self.currentLine is not None:
-            self.moveAccum += 0.36 * delta * self.moveMultiplier 
+            if self.hasBall == False:
+                self.moveAccum += 0.36 * delta * self.moveMultiplier 
+            else:
+                self.moveAccum += 0.36 * delta * self.moveMultiplier * 0.8
 
             targetAccum = 20
 
@@ -448,6 +449,8 @@ class Player(object):
         self.alive = True
         if self.gamepad is not None:
             self.ready = ecodes.KEY_UP in self.gamepad.active_keys()
+        elif self.keys is not None:
+            self.ready = pygame.key.get_pressed()[self.keys[0]]
             
             # pressed, released = self.move.get_button_events()
             # if (pressed & psmove.Btn_MOVE):
@@ -899,8 +902,10 @@ def startGame():
     print("Game started")
     global gameRunning
     global attractMode
+    global attractModeStart
     gameRunning = True
     attractMode = False
+    attractModeStart = False
     startSound.play()
     pygame.time.set_timer(USEREVENT_STARTGAME_COMPLETE, int(startSound.get_length()*1000))
     #startGamePart2()
@@ -1067,6 +1072,7 @@ winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
 loseSound = pygame.mixer.Sound('sounds/270329_jingle-lose-00.ogg')
 warning1Sound = pygame.mixer.Sound('sounds/vo_30seconds.ogg')
 warning2Sound = pygame.mixer.Sound('sounds/vo_10seconds.ogg')
+attractVOs = [pygame.mixer.Sound('sounds/attract_vo_1.ogg'), pygame.mixer.Sound('sounds/attract_vo_2.ogg'), pygame.mixer.Sound('sounds/attract_vo_3.ogg'), pygame.mixer.Sound('sounds/attract_vo_4.ogg'), pygame.mixer.Sound('sounds/attract_vo_5.ogg'), pygame.mixer.Sound('sounds/attract_vo_6.ogg'), pygame.mixer.Sound('sounds/attract_vo_7.ogg'), pygame.mixer.Sound('sounds/attract_vo_8.ogg'), pygame.mixer.Sound('sounds/attract_vo_9.ogg'), pygame.mixer.Sound('sounds/attract_vo_10.ogg')]
 
 ### MISC DECLARATIONS
 USEREVENT_STARTGAME_COMPLETE = pygame.USEREVENT+5
@@ -1084,6 +1090,7 @@ gameEnded = False
 powerupCount = 0
 
 attractMode = False
+attractModeStart = 0
 attractCycleIndex = 0
 attractCycleTime = 0
 attractCycleFX = None
@@ -1131,8 +1138,13 @@ while appRunning:
 
         # Start game?
         readyPlayers = list(filter(lambda player: player.ready, players))
-        if len(readyPlayers) > 1 and len(readyPlayers) == len(players):
-            startGame()
+        if len(readyPlayers) >= 1:
+            attractMode = False
+            attractModeStart = False
+            if len(readyPlayers) == len(players):
+                startGame()
+        elif len(readyPlayers) == 0 and attractModeStart == False:
+            attractModeStart = pygame.time.get_ticks() + 5000
 
     for event in events:
         if event.type == USEREVENT_STARTGAME_COMPLETE:
@@ -1185,15 +1197,23 @@ while appRunning:
             layout.handleMouseMove(event.pos)
 
 
+    if attractMode == False and attractModeStart != False and attractModeStart < pygame.time.get_ticks():
+        attractMode = True
     if attractMode == True:
-        if pygame.time.get_ticks() > attractCycleTime + 20000:
+        if pygame.time.get_ticks() > attractCycleTime + 2000:
+            totalCycles = 4
+            attractCycleIndex += 1
             attractCycleTime = pygame.time.get_ticks()
-            if attractCycleIndex == 0:
+            if attractCycleIndex % totalCycles == 0:
                 attractCycleFX = FXAmbient(1)
-            elif attractCycleIndex == 1:
-                attractCycleFX = FXPulse(1, [255, 0, 0])
-            elif attractCycleIndex == 2:
-                attractCycleFX = FXTrail(5, 5, 0.5, [255, 0, 0])
+            elif attractCycleIndex % totalCycles == 1:
+                attractCycleFX = FXPulse(1, None)
+            elif attractCycleIndex % totalCycles == 2:
+                attractCycleFX = FXTrail(5, 5, 0.5, None)
+            elif attractCycleIndex % totalCycles == 3:
+                attractCycleFX = FXFunky()
+            elif attractCycleIndex % totalCycles == 4:
+                attractCycleFX = FXPulse(2, (85, 85, 85))
 
 
     if attractCycleFX is not None:
