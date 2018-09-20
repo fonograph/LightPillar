@@ -1144,7 +1144,7 @@ while appRunning:
             if len(readyPlayers) == len(players):
                 startGame()
         elif len(readyPlayers) == 0 and attractModeStart == False:
-            attractModeStart = pygame.time.get_ticks() + 5000
+            attractModeStart = pygame.time.get_ticks() + 10000
 
     for event in events:
         if event.type == USEREVENT_STARTGAME_COMPLETE:
@@ -1200,10 +1200,10 @@ while appRunning:
     if attractMode == False and attractModeStart != False and attractModeStart < pygame.time.get_ticks():
         attractMode = True
     if attractMode == True:
-        if pygame.time.get_ticks() > attractCycleTime + 2000:
-            totalCycles = 4
+        if pygame.time.get_ticks() > attractCycleTime:
+            totalCycles = 5
             attractCycleIndex += 1
-            attractCycleTime = pygame.time.get_ticks()
+            attractCycleTime = pygame.time.get_ticks() + 10000
             if attractCycleIndex % totalCycles == 0:
                 attractCycleFX = FXAmbient(1)
             elif attractCycleIndex % totalCycles == 1:
@@ -1213,7 +1213,11 @@ while appRunning:
             elif attractCycleIndex % totalCycles == 3:
                 attractCycleFX = FXFunky()
             elif attractCycleIndex % totalCycles == 4:
-                attractCycleFX = FXPulse(2, (85, 85, 85))
+                attractCycleFX = FXPulse(4, (85, 85, 85))
+                vo = attractVOs[random.randrange(0, len(attractVOs))]
+                vo.play()
+                attractCycleTime = pygame.time.get_ticks() + vo.get_length() * 1000
+                
 
 
     if attractCycleFX is not None:
