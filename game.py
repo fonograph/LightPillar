@@ -1068,6 +1068,7 @@ beatSounds = [pygame.mixer.Sound('sounds/beat1.ogg'), pygame.mixer.Sound('sounds
 beatSounds[0].set_volume(0.2)
 beatSounds[1].set_volume(0.2)
 deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
+deathSound.set_volume(0.7)
 collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
 collectSound.set_volume(0.3)
 pickupSound = pygame.mixer.Sound('sounds/270341_pickup-04.ogg')
