@@ -311,6 +311,7 @@ class Player(object):
         self.gamepad = gamepad
         self.keys = keys
         self.nodeExitSound = nodeExitSound
+        self.nodeExitSound.set_volume(0.3)
         self.pickupSound = pickupSound
         self.winSound = winSound
         self.reset()
@@ -1068,6 +1069,7 @@ beatSounds[0].set_volume(0.2)
 beatSounds[1].set_volume(0.2)
 deathSound = pygame.mixer.Sound('sounds/270308_explosion-00.ogg')
 collectSound = pygame.mixer.Sound('sounds/270340_pickup-01.ogg')
+collectSound.set_volume(0.3)
 pickupSound = pygame.mixer.Sound('sounds/270341_pickup-04.ogg')
 startSound = pygame.mixer.Sound('sounds/start.ogg')
 winSound = pygame.mixer.Sound('sounds/270333_jingle-win-00.ogg')
