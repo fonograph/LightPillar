@@ -289,7 +289,7 @@ class Pixel(object):
         elif self.playerCapture is not None and self.player is None:
             self.color = self.playerCapture.color
             self.alpha = 1 - min(1, (pygame.time.get_ticks() - self.playerCaptureTime)/750) * 0.95
-            self.alpha += math.sin( (pygame.time.get_ticks() % (2000 + self.sparkleSeed*8000)) / (2000 + self.sparkleSeed*8000) * 6.28 ) * 0.1 + 0.1
+            self.alpha += math.sin( (pygame.time.get_ticks() % (2000 + self.sparkleSeed*8000)) / (2000 + self.sparkleSeed*8000) * 6.28 ) * 0.05 + 0.05
         self.alpha = min(1, self.alpha)
 
     def pulse(self, speed):
