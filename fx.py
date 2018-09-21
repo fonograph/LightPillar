@@ -100,7 +100,7 @@ class FXFunky(FX):
 
 	def getPixel(self, i):
 		color = wheel((i+(self.frame)) % 256)
-		alpha = math.sin((i+self.frame)*0.1) * 0.5 + 0.5
+		alpha = (math.sin((i+self.frame)*0.1) * 0.5 + 0.5) ** 1.5
 		color = (round(color[0]*alpha), round(color[1]*alpha), round(color[2]*alpha))
 		return color
 
