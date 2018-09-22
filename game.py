@@ -982,14 +982,14 @@ strands[0].initPixels()
 strands[1].initPixels([strands[2], strands[3], strands[4]])
 
 nodes = [
-    createNode('up', strands[0], 23, strands[1], 95),
+    createNode('up', strands[0], 23, strands[1], 93),
     createNode('up', strands[0], 47, strands[2], 99),
     createNode('up', strands[0], 71, strands[3], 114),
     createNode('up', strands[0], 95, strands[4], 110),
 
     createNode('down', strands[0], 144, strands[4], 1),
     createNode('down', strands[0], 167, strands[3], 15),
-    createNode('down', strands[0], 190, strands[2], 12),
+    createNode('down', strands[0], 191, strands[2], 12),
     createNode('down', strands[0], 216, strands[1], 18),
 
     createNode('up', strands[0], 263, strands[1], 32),
