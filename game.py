@@ -982,24 +982,24 @@ strands[0].initPixels()
 strands[1].initPixels([strands[2], strands[3], strands[4]])
 
 nodes = [
-    createNode('up', strands[0], 23, strands[1], 94),
+    createNode('up', strands[0], 23, strands[1], 95),
     createNode('up', strands[0], 47, strands[2], 99),
-    createNode('up', strands[0], 70, strands[3], 112),
-    createNode('up', strands[0], 95, strands[4], 109),
+    createNode('up', strands[0], 71, strands[3], 114),
+    createNode('up', strands[0], 95, strands[4], 110),
 
-    createNode('down', strands[0], 144, strands[4], 2),
-    createNode('down', strands[0], 168, strands[3], 16),
-    createNode('down', strands[0], 192, strands[2], 13),
-    createNode('down', strands[0], 215, strands[1], 19),
+    createNode('down', strands[0], 144, strands[4], 1),
+    createNode('down', strands[0], 167, strands[3], 15),
+    createNode('down', strands[0], 190, strands[2], 12),
+    createNode('down', strands[0], 216, strands[1], 18),
 
-    createNode('up', strands[0], 263, strands[1], 33),
+    createNode('up', strands[0], 263, strands[1], 32),
     createNode('up', strands[0], 287, strands[2], 38),
-    createNode('up', strands[0], 311, strands[3], 52),
+    createNode('up', strands[0], 311, strands[3], 53),
     createNode('up', strands[0], 335, strands[4], 49),
 
     createNode('down', strands[0], 384, strands[4], 62),
-    createNode('down', strands[0], 409, strands[3], 77),
-    createNode('down', strands[0], 433, strands[2], 74),
+    createNode('down', strands[0], 408, strands[3], 77),
+    createNode('down', strands[0], 432, strands[2], 74),
     createNode('down', strands[0], 457, strands[1], 80),
 ]   
 ### 
