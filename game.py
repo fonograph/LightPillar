@@ -1188,8 +1188,8 @@ while appRunning:
             if event.key == pygame.K_RETURN:
                 if gameRunning == False:
                     startGame()
-                else:
-                    resetGame()
+                # else:
+                #     resetGame()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             layout.handleMouseDown(event.pos)
